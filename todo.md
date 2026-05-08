@@ -56,7 +56,7 @@
 - [x] Persistir evidencia durante la sesión del expediente con URL, fecha de consulta, conector, estado, extracto textual, entidades extraídas, confianza y relación con el objetivo.
 - [x] Actualizar UI para distinguir con claridad `evidencia real`, `pendiente humano`, `sin acceso automatizado` y `demo desactivado`.
 - [x] Validar que las transformaciones ya no creen entidades útiles a partir de texto ficticio sino desde resultados reales o desde captura humana explícita.
-- [x] Ejecutar pruebas, publicar commit en GitHub y guardar checkpoint final. Validaciones locales pasan: `pnpm test`, `pnpm run check`, `pnpm run build`; versión lista para checkpoint/publicación.
+- [x] Ejecutar pruebas, publicar commit en GitHub y guardar checkpoint final. Validaciones locales pasan: `pnpm test`, `pnpm run check`, `pnpm run build`; commit publicado en GitHub: `d388606`.
 
 ## Ajuste arquitectónico: backend accesible desde la app Manus
 
