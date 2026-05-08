@@ -51,10 +51,9 @@ services:
 
   api:
     build:
-      context: ./apps/api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/api/Dockerfile
     platform: linux/arm64/v8
-    env_file: .env
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://osint:osint_dev_password@postgres:5432/osint_chile}
       NEO4J_URI: ${NEO4J_URI:-bolt://neo4j:7687}
