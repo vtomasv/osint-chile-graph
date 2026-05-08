@@ -1,10 +1,10 @@
 /**
  * Diseño seleccionado: Cartografía forense neo-brutalista chilena.
- * Este cliente API mantiene la estación de trabajo conectada al backend local,
+ * Este cliente API mantiene la estación de trabajo conectada al backend integrado del proyecto,
  * reforzando trazabilidad, evidencia y separación entre automatización y human-in-the-loop.
  */
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+export const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 export type Investigation = {
   id: string;
@@ -64,7 +64,24 @@ export type EvidenceItem = {
   extract: string;
   confidence: number;
   properties: Record<string, unknown>;
+  evidence_kind?: string;
+  is_verified_osint?: boolean;
   created_at: string;
+};
+
+export type SourceStatusItem = {
+  source: string;
+  status: "verified" | "operator_required" | "blocked" | "no_result" | "error" | string;
+  query?: string;
+  url?: string;
+  message?: string;
+  reason?: string;
+  checked_at?: string;
+  created_at?: string;
+  transform_id?: string;
+  run_id?: string;
+  input_type?: string;
+  input_value?: string;
 };
 
 export type HumanTaskItem = {
@@ -120,6 +137,8 @@ export type FindingsReport = {
     entities: number;
     relationships: number;
     evidence: number;
+    evidence_total_records?: number;
+    source_statuses?: number;
     human_tasks: number;
     pending_human_tasks?: number;
     transform_runs: number;
@@ -140,6 +159,7 @@ export type FindingsReport = {
   entity_profiles?: EntityProfile[];
   relationships: FindingRelationship[];
   evidence: EvidenceItem[];
+  source_statuses?: SourceStatusItem[];
   human_tasks: HumanTaskItem[];
   runs: TransformRunItem[];
   timeline: TimelineItem[];

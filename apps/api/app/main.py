@@ -30,14 +30,51 @@ def _entity_payload(entity: Entity) -> dict:
     return {"id": entity.id, "type": entity.type, "label": entity.label, "value": entity.value, "properties": entity.properties or {}, "confidence": entity.confidence}
 
 
+def _evidence_kind(evidence: Evidence) -> str:
+    props = evidence.properties or {}
+    if props.get("human_task_completed"):
+        return "operator_captured_evidence"
+    return str(props.get("evidence_kind") or props.get("source_state") or "unspecified")
+
+
+def _is_source_status(evidence: Evidence) -> bool:
+    return _evidence_kind(evidence) == "source_status" or evidence.source_name.startswith("source_status:")
+
+
+def _is_verified_evidence(evidence: Evidence) -> bool:
+    return _evidence_kind(evidence) in {"verified_evidence", "verified_public_search_result", "verified_public_api_result", "operator_captured_evidence"}
+
+
+def _is_local_algorithm_record(evidence: Evidence) -> bool:
+    return _evidence_kind(evidence) == "local_algorithm"
+
+
+def _source_statuses_from_runs(runs: list[TransformRun]) -> list[dict]:
+    statuses: list[dict] = []
+    for run in runs:
+        for status in (run.output or {}).get("source_statuses", []):
+            statuses.append({
+                **status,
+                "transform_id": run.transform_id,
+                "run_id": run.id,
+                "input_type": run.input_type,
+                "input_value": run.input_value,
+                "created_at": run.created_at.isoformat(),
+            })
+    return statuses
+
+
 def _evidence_payload(evidence: Evidence) -> dict:
+    props = evidence.properties or {}
     return {
         "id": evidence.id,
         "source_name": evidence.source_name,
         "source_url": evidence.source_url,
         "extract": evidence.extract,
         "confidence": evidence.confidence,
-        "properties": evidence.properties or {},
+        "properties": props,
+        "evidence_kind": _evidence_kind(evidence),
+        "is_verified_osint": _is_verified_evidence(evidence),
         "created_at": evidence.created_at.isoformat(),
     }
 
@@ -144,34 +181,43 @@ def _build_search_url(source: str, value: str, purpose: str = "") -> str:
 def _build_dossier_analysis(investigation: Investigation, entities: list[Entity], relationships: list[Relationship], evidence_rows: list[Evidence], runs: list[TransformRun]) -> dict:
     meaningful = [e for e in entities if e.type != "HumanTask"]
     human_tasks = [e for e in entities if e.type == "HumanTask"]
+    verified_evidence = [e for e in evidence_rows if _is_verified_evidence(e)]
+    local_only = [e for e in meaningful if (e.properties or {}).get("evidence_kind") == "local_algorithm"]
     top_types: dict[str, int] = {}
     for entity in meaningful:
         top_types[entity.type] = top_types.get(entity.type, 0) + 1
     strongest = sorted(meaningful, key=lambda item: item.confidence or 0, reverse=True)[:5]
     pending = [task for task in human_tasks if (task.properties or {}).get("status", "pending_manual_review") != "completed_by_operator"]
     executive = (
-        f"El expediente '{investigation.title}' contiene {len(meaningful)} entidades útiles, {len(relationships)} relaciones, "
-        f"{len(evidence_rows)} evidencias y {len(pending)} tareas humanas pendientes. "
-        "La lectura prioritaria debe centrarse en entidades con evidencia asociada y en compuertas HITL que pueden convertir indicios en datos verificables."
+        f"El expediente '{investigation.title}' contiene {len(meaningful)} entidades, "
+        f"pero sólo {len(verified_evidence)} evidencia(s) OSINT verificable(s) con URL/extracto o captura humana. "
+        f"Hay {len(local_only)} entidad(es) derivadas por algoritmos locales y {len(pending)} tarea(s) HITL pendiente(s). "
+        "Las entidades locales no deben tratarse como hallazgos confirmados hasta asociarlas con evidencia citada."
     )
+    key_findings = [
+        f"Evidencia verificada desde {e.source_name}: {e.extract[:160]}" for e in verified_evidence[:5]
+    ]
+    if not key_findings:
+        key_findings = ["Todavía no hay evidencia OSINT verificada; complete tareas HITL o configure conectores/API públicos autorizados."]
     return {
-        "mode": "AI-assisted local reasoning",
+        "mode": "evidence-first local reasoning",
         "executive_summary": executive,
-        "key_findings": [
-            f"{entity.type}: {entity.label} · confianza {round((entity.confidence or 0) * 100)}%" for entity in strongest
-        ] or ["Aún no existen entidades útiles suficientes; agrega semillas y ejecuta transforms."],
+        "key_findings": key_findings,
+        "candidate_entities": [
+            f"{entity.type}: {entity.label} · confianza algorítmica {round((entity.confidence or 0) * 100)}%" for entity in strongest
+        ],
         "gaps": [
-            "Varias fuentes chilenas requieren revisión manual por login, CAPTCHA, términos o autorización.",
-            "Las inferencias deben mantenerse separadas de hechos observados hasta contar con evidencia citada.",
-            "Faltan capturas o extractos de fuentes externas cuando sólo existe salida de transform local.",
+            "Las fuentes con CAPTCHA, login, términos restrictivos o bloqueo anti-bot se registran como HITL, no como evidencia automática.",
+            "Los algoritmos locales sólo normalizan o generan variantes; no confirman identidad, titularidad ni relación factual.",
+            "Para convertir una hipótesis en hallazgo debe existir URL, extracto, fecha de consulta, fuente y confianza explícita.",
         ],
         "recommended_next_steps": [
-            "Seleccionar una entidad central y completar sus tareas HITL desde el workspace integrado.",
-            "Guardar extractos, URL y confianza para alimentar el banco de datos del objetivo.",
-            "Usar el treemap y el Sankey para detectar transforms con bajo valor y fuentes con mayor utilidad.",
+            "Completar primero las tareas HITL asociadas al dato central y pegar extracto verificable desde la fuente.",
+            "Configurar conectores/API oficiales permitidos para automatizar fuentes que expongan acceso documentado.",
+            "Usar Sankey y estados de fuente para ver qué transforms realmente produjeron evidencia y cuáles sólo prepararon trabajo humano.",
         ],
         "entity_type_distribution": top_types,
-        "ai_status": "Narrativa local disponible. Configure Ollama o una API externa para generación LLM real desde prompts.",
+        "ai_status": "Narrativa local basada estrictamente en evidencia persistida; no inventa datos externos.",
     }
 
 
@@ -294,16 +340,59 @@ def run_transform(payload: TransformRunRequest):
         seed_id = make_id(payload.input_type, f"{payload.investigation_id}:{payload.value}")
         if not session.get(Entity, seed_id):
             session.add(Entity(id=seed_id, investigation_id=payload.investigation_id, type="Seed", label=payload.value, value=payload.value, properties={"input_type": payload.input_type}, confidence=1.0))
+        persisted_evidence: list[dict] = []
         for item in output.get("entities", []):
             entity_id = make_id(item["type"], f"{payload.investigation_id}:{item.get('value') or item['label']}")
-            entity = Entity(id=entity_id, investigation_id=payload.investigation_id, type=item["type"], label=item["label"], value=item.get("value", ""), properties=item.get("properties", {}), confidence=item.get("confidence", 0.8))
+            properties = item.get("properties", {}) or {}
+            evidence_kind = properties.get("evidence_kind", "local_algorithm")
+            entity = Entity(id=entity_id, investigation_id=payload.investigation_id, type=item["type"], label=item["label"], value=item.get("value", ""), properties=properties, confidence=item.get("confidence", 0.8))
             session.merge(entity)
             edge_id = make_id("edge", f"{seed_id}:{entity_id}:{payload.transform_id}")
-            edge = Relationship(id=edge_id, investigation_id=payload.investigation_id, source_id=seed_id, target_id=entity_id, type="FOUND_BY", properties={"transform_id": payload.transform_id, "run_id": run_id}, confidence=entity.confidence)
+            edge = Relationship(id=edge_id, investigation_id=payload.investigation_id, source_id=seed_id, target_id=entity_id, type="FOUND_BY", properties={"transform_id": payload.transform_id, "run_id": run_id, "evidence_kind": evidence_kind}, confidence=entity.confidence)
             session.merge(edge)
-            session.add(Evidence(id=make_id("evidence", f"{run_id}:{entity_id}"), investigation_id=payload.investigation_id, source_name=payload.transform_id, source_url="", extract=f"Transform {payload.transform_id} produjo {entity.label}", confidence=entity.confidence, properties=item.get("properties", {})))
+            if evidence_kind == "verified_evidence":
+                evidence = Evidence(
+                    id=make_id("evidence", f"{run_id}:{entity_id}:{properties.get('source_url', '')}"),
+                    investigation_id=payload.investigation_id,
+                    source_name=properties.get("source_name") or properties.get("connector") or payload.transform_id,
+                    source_url=properties.get("source_url", ""),
+                    extract=properties.get("extract") or f"Resultado público verificado: {entity.label}",
+                    confidence=entity.confidence,
+                    properties={**properties, "transform_id": payload.transform_id, "run_id": run_id, "entity_id": entity_id},
+                )
+                session.merge(evidence)
+                persisted_evidence.append({"id": evidence.id, "source_name": evidence.source_name, "source_url": evidence.source_url})
+            elif evidence_kind == "local_algorithm":
+                evidence = Evidence(
+                    id=make_id("evidence", f"{run_id}:{entity_id}:local_algorithm"),
+                    investigation_id=payload.investigation_id,
+                    source_name=f"local_algorithm:{payload.transform_id}",
+                    source_url="",
+                    extract=properties.get("risk_note") or f"Dato derivado por algoritmo local desde la semilla; no constituye OSINT externo verificado: {entity.label}",
+                    confidence=entity.confidence,
+                    properties={**properties, "transform_id": payload.transform_id, "run_id": run_id, "entity_id": entity_id},
+                )
+                session.merge(evidence)
+                persisted_evidence.append({"id": evidence.id, "source_name": evidence.source_name, "source_url": evidence.source_url})
             created_entities.append({"id": entity_id, "type": entity.type, "label": entity.label, "value": entity.value, "properties": entity.properties, "confidence": entity.confidence})
             created_edges.append({"id": edge_id, "source_id": seed_id, "target_id": entity_id, "type": "FOUND_BY", "confidence": entity.confidence})
+        for evidence_item in output.get("evidence", []):
+            properties = evidence_item.get("properties", {}) or {}
+            evidence = Evidence(
+                id=make_id("evidence", f"{run_id}:{evidence_item.get('source_name', '')}:{evidence_item.get('source_url', '')}:{evidence_item.get('extract', '')[:80]}"),
+                investigation_id=payload.investigation_id,
+                source_name=evidence_item.get("source_name", payload.transform_id),
+                source_url=evidence_item.get("source_url", ""),
+                extract=evidence_item.get("extract", "Evidencia pública registrada por conector."),
+                confidence=evidence_item.get("confidence", 0.65),
+                properties={**properties, "transform_id": payload.transform_id, "run_id": run_id},
+            )
+            session.merge(evidence)
+            persisted_evidence.append({"id": evidence.id, "source_name": evidence.source_name, "source_url": evidence.source_url})
+        # Los estados de fuente son telemetría operacional, no evidencia OSINT.
+        # Se conservan dentro del TransformRun para explicar bloqueos, ausencia de API o pasos HITL,
+        # pero no se persisten como Evidence ni se cuentan como hallazgos útiles del objetivo.
+        output["persisted_evidence"] = persisted_evidence
         for task in output.get("human_tasks", []):
             task_id = make_id("HumanTask", f"{payload.investigation_id}:{task['source']}:{payload.value}")
             entity = Entity(id=task_id, investigation_id=payload.investigation_id, type="HumanTask", label=f"HITL: {task['source']}", value=payload.value, properties=task, confidence=0.6)
@@ -329,13 +418,16 @@ def get_investigation_findings(investigation_id: str):
             raise HTTPException(status_code=404, detail="Investigación no encontrada")
         entities = session.scalars(select(Entity).where(Entity.investigation_id == investigation_id).order_by(Entity.type.asc(), Entity.label.asc())).all()
         relationships = session.scalars(select(Relationship).where(Relationship.investigation_id == investigation_id)).all()
-        evidence_rows = session.scalars(select(Evidence).where(Evidence.investigation_id == investigation_id).order_by(Evidence.created_at.desc())).all()
+        evidence_rows_raw = session.scalars(select(Evidence).where(Evidence.investigation_id == investigation_id).order_by(Evidence.created_at.desc())).all()
         runs = session.scalars(select(TransformRun).where(TransformRun.investigation_id == investigation_id).order_by(TransformRun.created_at.desc())).all()
+        evidence_rows = [evidence for evidence in evidence_rows_raw if not _is_source_status(evidence)]
+        verified_evidence_rows = [evidence for evidence in evidence_rows if _is_verified_evidence(evidence)]
+        source_statuses = _source_statuses_from_runs(runs)
 
         entity_lookup = {entity.id: entity for entity in entities}
         human_tasks = [entity for entity in entities if entity.type == "HumanTask"]
         evidence_by_source: dict[str, int] = {}
-        for evidence in evidence_rows:
+        for evidence in verified_evidence_rows:
             evidence_by_source.setdefault(evidence.source_name, 0)
             evidence_by_source[evidence.source_name] += 1
 
@@ -346,7 +438,7 @@ def get_investigation_findings(investigation_id: str):
             confidence_sum += entity.confidence or 0
 
         relationship_items = [_relationship_payload(rel, entity_lookup) for rel in relationships]
-        evidence_items = [_evidence_payload(evidence) for evidence in evidence_rows]
+        evidence_items = [_evidence_payload(evidence) for evidence in verified_evidence_rows]
 
         run_items = [
             {
@@ -365,15 +457,17 @@ def get_investigation_findings(investigation_id: str):
         ]
 
         timeline = []
-        for evidence in evidence_rows:
-            timeline.append({"at": evidence.created_at.isoformat(), "kind": "evidence", "title": evidence.source_name, "detail": evidence.extract, "confidence": evidence.confidence})
+        for evidence in verified_evidence_rows:
+            timeline.append({"at": evidence.created_at.isoformat(), "kind": "verified_evidence", "title": evidence.source_name, "detail": evidence.extract, "confidence": evidence.confidence})
+        for status in source_statuses:
+            timeline.append({"at": status.get("created_at", ""), "kind": "source_status", "title": status.get("source", "Fuente"), "detail": f"{status.get('status', 'estado')} · {status.get('reason', '')}", "confidence": 0.0})
         for run in runs:
             timeline.append({"at": run.created_at.isoformat(), "kind": "transform", "title": run.transform_id, "detail": f"{run.input_type}={run.input_value}", "confidence": 1.0})
         timeline = sorted(timeline, key=lambda item: item["at"], reverse=True)[:120]
 
         entity_profiles = []
         for entity in entities:
-            entity_evidence_rows = _find_related_evidence(entity, evidence_rows, relationships)
+            entity_evidence_rows = _find_related_evidence(entity, verified_evidence_rows, relationships)
             entity_evidence = [_evidence_payload(evidence) for evidence in entity_evidence_rows]
             direct_relationships = [rel for rel in relationship_items if rel["source_id"] == entity.id or rel["target_id"] == entity.id]
             task_count = len([rel for rel in direct_relationships if rel["type"] == "REQUIRES_HUMAN"])
@@ -407,7 +501,9 @@ def get_investigation_findings(investigation_id: str):
             "summary": {
                 "entities": len(entities),
                 "relationships": len(relationships),
-                "evidence": len(evidence_rows),
+                "evidence": len(verified_evidence_rows),
+                "evidence_total_records": len(evidence_rows),
+                "source_statuses": len(source_statuses),
                 "human_tasks": len(human_tasks),
                 "pending_human_tasks": len([task for task in task_items if task["status"] != "completed_by_operator"]),
                 "transform_runs": len(runs),
@@ -423,7 +519,8 @@ def get_investigation_findings(investigation_id: str):
             "human_tasks": task_items,
             "runs": run_items,
             "timeline": timeline,
-            "visualizations": _build_visualizations(entities, relationships, runs, evidence_rows),
+            "source_statuses": source_statuses,
+            "visualizations": _build_visualizations(entities, relationships, runs, verified_evidence_rows),
         }
 
 

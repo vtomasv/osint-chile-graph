@@ -3,6 +3,17 @@ import re
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from .osint_connectors import (
+    generic_public_queries,
+    google_search_url,
+    manual_source_task,
+    mercado_publico_supplier_by_rut,
+    phone_public_queries,
+    plate_public_queries,
+    public_web_evidence,
+    rut_public_queries,
+)
+
 
 @dataclass(frozen=True)
 class TransformDefinition:
@@ -20,28 +31,36 @@ class TransformDefinition:
 TRANSFORMS: list[TransformDefinition] = [
     TransformDefinition("cl.rut.normalize", "Normalizar y validar RUT", "Valida dígito verificador, genera formato canónico y metadatos de consistencia.", ["rut"], ["Identifier"], "automatic", "low", False, "local_algorithm"),
     TransformDefinition("cl.rut.variants", "Variantes de búsqueda RUT", "Genera RUT con/sin puntos, sin guion, cuerpo numérico y tokens útiles para correlación pasiva.", ["rut"], ["IdentifierVariant"], "automatic", "low", False, "local_algorithm"),
-    TransformDefinition("cl.rut.dorks", "Dorks especializados para RUT", "Crea consultas pasivas para documentos públicos, Diario Oficial, Mercado Público y PDFs indexados.", ["rut"], ["DorkQuery"], "automatic", "low", False, "public_passive"),
+    TransformDefinition("cl.rut.dorks", "Búsqueda pública verificable de RUT", "Ejecuta búsqueda pública pasiva y persiste sólo resultados reales con URL, título, extracto y fecha; los sitios restringidos quedan como HITL.", ["rut"], ["WebEvidence", "Evidence", "SourceStatus"], "automatic", "low", False, "public_passive_verified"),
     TransformDefinition("cl.rut.public_records.human", "RUT en fuentes públicas autorizadas HITL", "Prepara verificación manual en fuentes chilenas que pueden requerir autorización, CAPTCHA o revisión de términos.", ["rut"], ["HumanTask"], "human_in_the_loop", "medium", True, "manual_authorized"),
     TransformDefinition("cl.rut.business_links.human", "Vínculos societarios por RUT HITL", "Crea tareas para contrastar participación societaria, publicaciones y documentos públicos asociados al RUT.", ["rut"], ["HumanTask"], "human_in_the_loop", "medium", True, "manual_authorized"),
     TransformDefinition("cl.email.analyze", "Analizar email .cl", "Normaliza email, extrae dominio, TLD, usuario y señales básicas de organización chilena.", ["email"], ["Email", "Domain"], "automatic", "low", False, "local_algorithm"),
-    TransformDefinition("cl.email.dorks", "Dorks para email", "Genera consultas pasivas para email exacto, dominio asociado, documentos y repositorios públicos.", ["email"], ["DorkQuery"], "automatic", "low", False, "public_passive"),
+    TransformDefinition("cl.email.dorks", "Búsqueda pública verificable de email", "Consulta resultados públicos indexados para el email y persiste evidencia real citada, no dorks como hallazgos.", ["email"], ["WebEvidence", "Evidence", "SourceStatus"], "automatic", "low", False, "public_passive_verified"),
     TransformDefinition("cl.phone.normalize", "Normalizar teléfono chileno", "Normaliza a E.164, clasifica móvil/fijo/geográfico y prepara enriquecimiento autorizado.", ["phone"], ["Phone", "HumanTask"], "automatic", "low", False, "local_algorithm"),
     TransformDefinition("cl.phone.variants", "Variantes de búsqueda teléfono", "Genera representaciones con +56, 56, espacios, guiones y formato local para correlación manual.", ["phone"], ["IdentifierVariant"], "automatic", "low", False, "local_algorithm"),
-    TransformDefinition("cl.phone.dorks", "Dorks para teléfono", "Crea consultas pasivas para teléfono exacto en documentos públicos y sitios chilenos.", ["phone"], ["DorkQuery"], "automatic", "low", False, "public_passive"),
+    TransformDefinition("cl.phone.dorks", "Búsqueda pública verificable de teléfono", "Consulta resultados públicos indexados para el teléfono y persiste evidencia real citada; portabilidad y mensajería quedan HITL.", ["phone"], ["WebEvidence", "Evidence", "SourceStatus"], "automatic", "low", False, "public_passive_verified"),
     TransformDefinition("cl.phone.messaging.human", "Verificación mensajería HITL", "Prepara verificación manual no intrusiva de disponibilidad en canales de contacto permitidos.", ["phone"], ["HumanTask"], "human_in_the_loop", "medium", True, "manual_authorized"),
     TransformDefinition("cl.phone.carrier.human", "Carrier/portabilidad autorizada HITL", "Genera tarea para consultar operador o portabilidad solo mediante fuentes autorizadas.", ["phone"], ["HumanTask"], "human_in_the_loop", "medium", True, "manual_authorized"),
     TransformDefinition("cl.plate.normalize", "Normalizar patente chilena", "Valida formatos frecuentes de patente chilena: moderna, antigua, moto y casos por revisar.", ["plate"], ["Vehicle"], "automatic", "low", False, "local_algorithm"),
     TransformDefinition("cl.plate.variants", "Variantes de búsqueda patente", "Genera patente sin separadores, con guion, espacios y patrones útiles para búsqueda documental.", ["plate"], ["IdentifierVariant"], "automatic", "low", False, "local_algorithm"),
-    TransformDefinition("cl.plate.dorks", "Dorks para patente", "Crea consultas pasivas para patente en documentos, publicaciones, avisos y fuentes abiertas permitidas.", ["plate"], ["DorkQuery"], "automatic", "low", False, "public_passive"),
+    TransformDefinition("cl.plate.dorks", "Búsqueda pública verificable de patente", "Consulta resultados públicos indexados para la patente y persiste evidencia real citada; servicios vehiculares restringidos quedan HITL.", ["plate"], ["WebEvidence", "Evidence", "SourceStatus"], "automatic", "low", False, "public_passive_verified"),
     TransformDefinition("cl.plate.vehicle_records.human", "Registros vehiculares HITL", "Prepara consulta manual autorizada de registros, multas o antecedentes vehiculares aplicables.", ["plate"], ["HumanTask"], "human_in_the_loop", "medium", True, "manual_authorized"),
     TransformDefinition("cl.domain.analyze", "Analizar dominio", "Normaliza dominio, detecta TLD .cl, subdominio probable y artefactos web básicos.", ["domain"], ["Domain", "WebArtifact"], "automatic", "low", False, "local_algorithm"),
-    TransformDefinition("cl.domain.dorks", "Dorks para dominio", "Genera búsquedas pasivas para PDFs, correos publicados, rutas sensibles indexadas y menciones del dominio.", ["domain"], ["DorkQuery"], "automatic", "low", False, "public_passive"),
-    TransformDefinition("cl.name.variants", "Variantes de nombre", "Genera variantes de búsqueda de persona, iniciales y combinaciones para revisión de fuentes públicas.", ["name"], ["IdentifierVariant", "DorkQuery"], "automatic", "low", False, "local_algorithm"),
-    TransformDefinition("cl.company.variants", "Variantes de empresa", "Normaliza razón social, remueve sufijos frecuentes y genera consultas pasivas para documentos públicos.", ["company"], ["IdentifierVariant", "DorkQuery"], "automatic", "low", False, "local_algorithm"),
+    TransformDefinition("cl.domain.dorks", "Búsqueda pública verificable de dominio", "Consulta resultados públicos indexados del dominio y persiste evidencia real citada, separada de inferencias locales.", ["domain"], ["WebEvidence", "Evidence", "SourceStatus"], "automatic", "low", False, "public_passive_verified"),
+    TransformDefinition("cl.name.variants", "Variantes de nombre", "Genera variantes locales de nombre; no crea hallazgos OSINT sin evidencia externa.", ["name"], ["IdentifierVariant"], "automatic", "low", False, "local_algorithm"),
+    TransformDefinition("cl.company.variants", "Variantes de empresa", "Normaliza razón social y sufijos frecuentes; no crea hallazgos OSINT sin evidencia externa.", ["company"], ["IdentifierVariant"], "automatic", "low", False, "local_algorithm"),
     TransformDefinition("cl.company.public_records.human", "Empresa en fuentes públicas HITL", "Prepara búsquedas autorizadas en Diario Oficial, Mercado Público y Registro de Empresas.", ["company"], ["HumanTask"], "human_in_the_loop", "medium", True, "manual_authorized"),
-    TransformDefinition("cl.dork.generate", "Generar dorks seguros", "Crea consultas genéricas para fuentes públicas y documentos abiertos según el tipo de semilla.", ["rut", "email", "phone", "plate", "name", "company", "domain"], ["DorkQuery"], "automatic", "low", False, "public_passive"),
+    TransformDefinition("cl.dork.generate", "Búsqueda pública verificable genérica", "Ejecuta consultas públicas pasivas y crea únicamente evidencias reales verificables o estados de fuente, nunca dorks como hallazgos.", ["rut", "email", "phone", "plate", "name", "company", "domain"], ["WebEvidence", "Evidence", "SourceStatus"], "automatic", "low", False, "public_passive_verified"),
     TransformDefinition("cl.source.diario_oficial.human", "Diario Oficial HITL", "Prepara búsqueda manual autorizada en Diario Oficial.", ["rut", "name", "company"], ["HumanTask"], "human_in_the_loop", "medium", True, "manual_authorized"),
     TransformDefinition("cl.source.registro_empresas.human", "Registro empresas HITL", "Prepara consulta manual autorizada de empresa/RUT.", ["rut", "company"], ["HumanTask"], "human_in_the_loop", "medium", True, "manual_authorized"),
+    TransformDefinition("cl.rut.diario_oficial.human", "RUT → Diario Oficial HITL", "Abre una consulta focalizada para publicaciones del Diario Oficial asociadas al RUT; no crea hallazgos sin captura humana.", ["rut"], ["HumanTask"], "human_in_the_loop", "medium", True, "manual_authorized"),
+    TransformDefinition("cl.rut.poder_judicial.human", "RUT → Poder Judicial HITL", "Prepara búsqueda manual autorizada en canales del Poder Judicial o consulta pública permitida; requiere operador y base legítima.", ["rut"], ["HumanTask"], "human_in_the_loop", "high", True, "manual_authorized"),
+    TransformDefinition("cl.phone.caller_id.human", "Teléfono → directorios/caller ID HITL", "Genera tareas para revisar fuentes de caller ID o directorios sólo con autorización, sin llamadas ni mensajes automáticos.", ["phone"], ["HumanTask"], "human_in_the_loop", "medium", True, "manual_authorized"),
+    TransformDefinition("cl.phone.denuncias_sernac_subtel.human", "Teléfono → SERNAC/Subtel HITL", "Prepara búsquedas manuales en reclamos, fiscalización o documentos públicos asociados a un teléfono, cuando sea legalmente procedente.", ["phone"], ["HumanTask"], "human_in_the_loop", "medium", True, "manual_authorized"),
+    TransformDefinition("cl.plate.registro_civil.human", "Patente → Registro Civil HITL", "Prepara consulta manual de certificado/anotaciones vehiculares mediante canal autorizado; no automatiza trámites ni pagos.", ["plate"], ["HumanTask"], "human_in_the_loop", "medium", True, "manual_authorized"),
+    TransformDefinition("cl.plate.sernac.human", "Patente → SERNAC/recalls HITL", "Prepara revisión manual de menciones públicas, recalls, reclamos o alertas asociadas a patente/modelo cuando la fuente lo permita.", ["plate"], ["HumanTask"], "human_in_the_loop", "medium", True, "manual_authorized"),
+    TransformDefinition("cl.email.breach_check.human", "Email → brechas públicas HITL/API", "Prepara verificación de brechas sólo mediante API autorizada o consulta manual legítima; no consulta servicios con credenciales inexistentes.", ["email"], ["HumanTask"], "human_in_the_loop", "medium", True, "manual_authorized"),
+    TransformDefinition("cl.name.linkedin.human", "Nombre → LinkedIn/dorks HITL", "Prepara búsquedas manuales en LinkedIn u otras fuentes profesionales respetando login, términos y finalidad del caso.", ["name"], ["HumanTask"], "human_in_the_loop", "medium", True, "manual_authorized"),
     TransformDefinition("ai.extract_entities", "Extraer entidades con IA", "Extrae entidades y relaciones desde texto usando prompts configurables.", ["text"], ["Entity", "Relationship"], "automatic", "medium", False, "ai_inference"),
 ]
 
@@ -186,14 +205,14 @@ def name_variants(value: str) -> list[dict[str, Any]]:
     candidates = [clean, clean.upper(), clean.lower()]
     if len(parts) >= 2:
         candidates.extend([f"{parts[0]} {parts[-1]}", f"{parts[-1]}, {parts[0]}", " ".join([p[0] for p in parts if p]) + " " + parts[-1]])
-    return _variants_to_entities("IdentifierVariant", "name", candidates, {"parts": parts}) + _dork_entities(generate_dorks("name", clean))
+    return _variants_to_entities("IdentifierVariant", "name", candidates, {"parts": parts, "evidence_kind": "local_algorithm"})
 
 
 def company_variants(value: str) -> list[dict[str, Any]]:
     clean = " ".join(value.strip().split())
     simplified = re.sub(r"\b(spa|s\.a\.?|sa|ltda\.?|limitada|eirl)\b", "", clean, flags=re.I).strip(" ,.-")
     candidates = [clean, clean.upper(), simplified, f"{simplified} chile" if simplified else ""]
-    return _variants_to_entities("IdentifierVariant", "company", candidates, {"simplified": simplified}) + _dork_entities(generate_dorks("company", clean))
+    return _variants_to_entities("IdentifierVariant", "company", candidates, {"simplified": simplified, "evidence_kind": "local_algorithm"})
 
 
 def _variants_to_entities(entity_type: str, variant_type: str, candidates: list[str], extra: dict[str, Any] | None = None) -> list[dict[str, Any]]:
@@ -209,7 +228,7 @@ def _variants_to_entities(entity_type: str, variant_type: str, candidates: list[
             "label": normalized,
             "value": normalized,
             "confidence": 0.74,
-            "properties": {"variant_type": variant_type, **(extra or {})},
+            "properties": {"variant_type": variant_type, "evidence_kind": (extra or {}).get("evidence_kind", "local_algorithm"), **(extra or {})},
         })
     return entities
 
@@ -260,74 +279,170 @@ def _dork_entities(items: list[dict[str, str]]) -> list[dict[str, Any]]:
     return [{"type": "DorkQuery", "label": item["source"], "value": item["query"], "confidence": 0.72, "properties": item} for item in items]
 
 
-def human_task(source: str, value: str, purpose: str | None = None) -> dict[str, Any]:
-    return {
-        "type": "HumanTask",
-        "source": source,
-        "value": value,
-        "status": "pending_manual_review",
-        "purpose": purpose or "Verificación manual autorizada de una fuente pública o restringida.",
-        "reason": "La fuente puede requerir login, CAPTCHA, autorización, pago, términos específicos o validación manual.",
-        "instructions": "Abrir la fuente en navegador, revisar términos aplicables, ejecutar la consulta solo si existe autorización y registrar evidencia verificable con fecha, URL y extracto.",
-        "expected_evidence": ["URL o nombre de fuente", "fecha/hora de consulta", "extracto textual", "captura o referencia documental si procede"],
+def human_task(source: str, value: str, purpose: str | None = None, url: str | None = None, reason: str | None = None) -> dict[str, Any]:
+    query = f"{source} {value}".strip()
+    return manual_source_task(
+        source,
+        value,
+        purpose or "Verificación manual autorizada de una fuente pública o restringida.",
+        url or google_search_url(query),
+        reason=reason,
+    )
+
+
+def _rut_public_evidence(value: str) -> dict[str, Any]:
+    data = validate_rut(value)
+    official = mercado_publico_supplier_by_rut(value)
+    public = public_web_evidence("rut", value, rut_public_queries(value, data.get("compact", ""), data.get("normalized", value)), max_results_per_query=2)
+    result = {
+        "entities": [*official.get("entities", []), *public.get("entities", [])],
+        "evidence": [*official.get("evidence", []), *public.get("evidence", [])],
+        "source_statuses": [*official.get("source_statuses", []), *public.get("source_statuses", [])],
+        "human_tasks": [],
     }
+    result["human_tasks"].extend([
+        human_task("SII situación tributaria de terceros", value, "Consultar información tributaria pública sólo si el operador supera manualmente los controles y tiene base legítima; guardar extracto y URL exacta.", "https://www2.sii.cl/stc/noauthz", "SII aplica controles anti-automatización y condiciones de uso; el sistema no evade CAPTCHA ni automatiza sesiones."),
+        human_task("Rutificador autorizado", value, "Revisar una fuente de rutificación sólo si sus términos y la finalidad del caso lo permiten; guardar evidencia explícita, no inferencias.", google_search_url(f"rutificador {value}"), "No se automatiza scraping de rutificadores no oficiales o con términos restrictivos."),
+    ])
+    return result
+
+
+def _phone_public_evidence(value: str) -> dict[str, Any]:
+    data = normalize_phone(value)
+    result = public_web_evidence("phone", value, phone_public_queries(value, data.get("normalized", value), data.get("national", "")), max_results_per_query=2)
+    if not result.get("evidence"):
+        result.setdefault("human_tasks", []).extend([
+            human_task("Búsqueda web autorizada de teléfono", data.get("normalized", value), "Buscar el número en fuentes públicas permitidas y guardar sólo evidencia textual verificable.", google_search_url(data.get("normalized", value))),
+            human_task("Portabilidad/Subtel u operador autorizado", data.get("normalized", value), "Verificar carrier o portabilidad sólo mediante fuente autorizada o consentimiento aplicable.", google_search_url(f"Subtel portabilidad {data.get('national', value)}"), "No existe conector público confiable de lookup telefónico individual sin restricciones; requiere operador."),
+        ])
+    return result
+
+
+def _plate_public_evidence(value: str) -> dict[str, Any]:
+    data = normalize_plate(value)
+    result = public_web_evidence("plate", value, plate_public_queries(value, data.get("normalized", value)))
+    if not result.get("entities"):
+        result.setdefault("human_tasks", []).append(human_task("Volante o Maleta / informe vehicular autorizado", data.get("normalized", value), "Consultar antecedentes vehiculares sólo desde fuente autorizada y registrar evidencia textual verificable.", google_search_url(f"Volante o Maleta patente {data.get('normalized', value)}")))
+    return result
+
+
+def _generic_public_evidence(input_type: str, value: str) -> dict[str, Any]:
+    result = public_web_evidence(input_type, value, generic_public_queries(input_type, value), max_results_per_query=2)
+    if not result.get("evidence"):
+        result.setdefault("human_tasks", []).append(human_task("Búsqueda web pública autorizada", value, "Continuar manualmente porque el buscador público automatizado no entregó resultados verificables.", google_search_url(value), "No se crea evidencia automática sin URL y extracto verificable."))
+    return result
 
 
 def execute_transform(transform_id: str, input_type: str, value: str) -> dict[str, Any]:
     if transform_id == "cl.rut.normalize":
         data = validate_rut(value)
-        return {"entities": [{"type": "Identifier", "label": data["normalized"], "value": data.get("compact", value), "properties": data, "confidence": 0.95 if data.get("valid") else 0.45}]}
+        return {"entities": [{"type": "Identifier", "label": data["normalized"], "value": data.get("compact", value), "properties": {**data, "evidence_kind": "local_algorithm"}, "confidence": 0.95 if data.get("valid") else 0.45}]}
     if transform_id == "cl.rut.variants":
         return {"entities": rut_variants(value)}
     if transform_id == "cl.rut.dorks":
-        return {"entities": _dork_entities(generate_dorks("rut", value))}
+        return _rut_public_evidence(value)
     if transform_id == "cl.rut.public_records.human":
-        return {"human_tasks": [human_task("Diario Oficial", value, "Buscar publicaciones públicas asociadas al RUT."), human_task("Mercado Público", value, "Contrastar apariciones en contratos, compras o licitaciones públicas."), human_task("Documentos públicos indexados", value, "Validar menciones en PDFs o resoluciones abiertas.")]}
+        return {"human_tasks": [human_task("Diario Oficial", value, "Buscar publicaciones públicas asociadas al RUT.", google_search_url(f"site:diariooficial.interior.gob.cl {value}")), human_task("Mercado Público", value, "Contrastar apariciones en contratos, compras o licitaciones públicas.", google_search_url(f"site:mercadopublico.cl {value}")), human_task("SII situación tributaria de terceros", value, "Consultar información tributaria pública sólo si existe base legítima y el operador completa manualmente los controles.", "https://www2.sii.cl/stc/noauthz", "SII aplica controles anti-automatización; no se automatiza ni evade CAPTCHA.")]}
     if transform_id == "cl.rut.business_links.human":
-        return {"human_tasks": [human_task("Registro de Empresas y Sociedades", value, "Revisar participación societaria o representación legal con autorización."), human_task("SII u organismo tributario autorizado", value, "Validar información tributaria solo con permisos correspondientes.")]}
+        return {"human_tasks": [human_task("Registro de Empresas y Sociedades", value, "Revisar participación societaria o representación legal con autorización.", google_search_url(f"Registro de Empresas y Sociedades {value}")), human_task("SII u organismo tributario autorizado", value, "Validar información tributaria sólo con permisos correspondientes.", "https://www2.sii.cl/stc/noauthz", "Consulta protegida; requiere operador humano autorizado.")]}
     if transform_id == "cl.email.analyze":
         data = normalize_email(value)
-        entities = [{"type": "Email", "label": data["email"], "value": data["email"], "properties": data, "confidence": 0.9 if data.get("valid") else 0.35}]
+        entities = [{"type": "Email", "label": data["email"], "value": data["email"], "properties": {**data, "evidence_kind": "local_algorithm"}, "confidence": 0.9 if data.get("valid") else 0.35}]
         if data.get("domain"):
-            entities.append({"type": "Domain", "label": data["domain"], "value": data["domain"], "properties": {"tld": data["tld"], "is_cl": data["is_cl"]}, "confidence": 0.82})
+            entities.append({"type": "Domain", "label": data["domain"], "value": data["domain"], "properties": {"tld": data["tld"], "is_cl": data["is_cl"], "evidence_kind": "local_algorithm"}, "confidence": 0.82})
         return {"entities": entities, "relationships": [{"source_label": data["email"], "target_label": data.get("domain", ""), "type": "HAS_DOMAIN"}] if data.get("domain") else []}
     if transform_id == "cl.email.dorks":
-        return {"entities": _dork_entities(generate_dorks("email", value))}
+        return _generic_public_evidence("email", value)
     if transform_id == "cl.phone.normalize":
         data = normalize_phone(value)
-        return {"entities": [{"type": "Phone", "label": data["normalized"], "value": data["normalized"], "properties": data, "confidence": 0.86 if data.get("valid_shape") else 0.42}], "human_tasks": [human_task("authorized_phone_enrichment", data["normalized"], "Enriquecimiento autorizado de teléfono, sin llamadas ni mensajes automáticos.")]}
+        normalized = data["normalized"]
+        return {"entities": [{"type": "Phone", "label": normalized, "value": normalized, "properties": {**data, "evidence_kind": "local_algorithm"}, "confidence": 0.86 if data.get("valid_shape") else 0.42}], "human_tasks": [human_task("Enriquecimiento telefónico autorizado", normalized, "Enriquecimiento autorizado de teléfono, sin llamadas ni mensajes automáticos.", google_search_url(f"{normalized} teléfono Chile"))]}
     if transform_id == "cl.phone.variants":
         return {"entities": phone_variants(value)}
     if transform_id == "cl.phone.dorks":
-        return {"entities": _dork_entities(generate_dorks("phone", value))}
+        return _phone_public_evidence(value)
     if transform_id == "cl.phone.messaging.human":
-        return {"human_tasks": [human_task("WhatsApp/manual contact verification", normalize_phone(value)["normalized"], "Confirmar disponibilidad solo si existe base legal o autorización; no automatizar contacto.")]}
+        return {"human_tasks": [human_task("WhatsApp / verificación manual no intrusiva", normalize_phone(value)["normalized"], "Confirmar disponibilidad sólo si existe base legal o autorización; no automatizar contacto.", "https://web.whatsapp.com/", "Requiere operador humano; el sistema no envía mensajes ni llamadas automáticas.")]}
     if transform_id == "cl.phone.carrier.human":
-        return {"human_tasks": [human_task("Carrier/portabilidad autorizada", normalize_phone(value)["normalized"], "Consultar operador o portabilidad mediante canal legítimo y autorizado.")]}
+        normalized = normalize_phone(value)["normalized"]
+        return {"human_tasks": [human_task("Carrier/portabilidad autorizada", normalized, "Consultar operador o portabilidad mediante canal legítimo y autorizado.", google_search_url(f"portabilidad Chile {normalized}"))]}
     if transform_id == "cl.plate.normalize":
         data = normalize_plate(value)
-        return {"entities": [{"type": "Vehicle", "label": data["normalized"], "value": data["normalized"], "properties": data, "confidence": 0.86 if data.get("valid_shape") else 0.38}]}
+        return {"entities": [{"type": "Vehicle", "label": data["normalized"], "value": data["normalized"], "properties": {**data, "evidence_kind": "local_algorithm"}, "confidence": 0.86 if data.get("valid_shape") else 0.38}]}
     if transform_id == "cl.plate.variants":
         return {"entities": plate_variants(value)}
     if transform_id == "cl.plate.dorks":
-        return {"entities": _dork_entities(generate_dorks("plate", value))}
+        return _plate_public_evidence(value)
     if transform_id == "cl.plate.vehicle_records.human":
-        return {"human_tasks": [human_task("Registro Civil o canal vehicular autorizado", normalize_plate(value)["normalized"], "Consultar antecedentes vehiculares solo con permisos aplicables."), human_task("Municipalidades/multas públicas", normalize_plate(value)["normalized"], "Revisar fuentes municipales abiertas si sus términos lo permiten.")]}
+        normalized = normalize_plate(value)["normalized"]
+        return {"human_tasks": [human_task("Registro Civil o canal vehicular autorizado", normalized, "Consultar antecedentes vehiculares sólo con permisos aplicables.", google_search_url(f"certificado anotaciones vigentes patente {normalized}")), human_task("Volante o Maleta / informe vehicular autorizado", normalized, "Consultar informe vehicular sólo si el operador cuenta con autorización y acepta términos aplicables.", google_search_url(f"Volante o Maleta patente {normalized}")), human_task("Municipalidades/multas públicas", normalized, "Revisar fuentes municipales abiertas si sus términos lo permiten.", google_search_url(f"multas patente {normalized} municipalidad Chile"))]}
     if transform_id == "cl.domain.analyze":
         data = normalize_domain(value)
-        return {"entities": [{"type": "Domain", "label": data["domain"], "value": data["domain"], "properties": data, "confidence": 0.86 if data.get("valid") else 0.4}, {"type": "WebArtifact", "label": f"https://{data['domain']}", "value": f"https://{data['domain']}", "properties": {"artifact_type": "url_candidate", **data}, "confidence": 0.62}]}
+        return {"entities": [{"type": "Domain", "label": data["domain"], "value": data["domain"], "properties": {**data, "evidence_kind": "local_algorithm"}, "confidence": 0.86 if data.get("valid") else 0.4}, {"type": "WebArtifact", "label": f"https://{data['domain']}", "value": f"https://{data['domain']}", "properties": {"artifact_type": "url_candidate", "evidence_kind": "local_algorithm", **data}, "confidence": 0.62}]}
     if transform_id == "cl.domain.dorks":
-        return {"entities": _dork_entities(generate_dorks("domain", value))}
+        return _generic_public_evidence("domain", value)
     if transform_id == "cl.name.variants":
         return {"entities": name_variants(value)}
     if transform_id == "cl.company.variants":
         return {"entities": company_variants(value)}
     if transform_id == "cl.company.public_records.human":
-        return {"human_tasks": [human_task("Diario Oficial", value, "Buscar constituciones, modificaciones o publicaciones societarias."), human_task("Mercado Público", value, "Revisar proveedor, adjudicaciones o contratos públicos."), human_task("Registro de Empresas y Sociedades", value, "Contrastar razón social y representantes si existe autorización.")]}
+        return {"human_tasks": [human_task("Diario Oficial", value, "Buscar constituciones, modificaciones o publicaciones societarias.", google_search_url(f"site:diariooficial.interior.gob.cl {value}")), human_task("Mercado Público", value, "Revisar proveedor, adjudicaciones o contratos públicos.", google_search_url(f"site:mercadopublico.cl {value}")), human_task("Registro de Empresas y Sociedades", value, "Contrastar razón social y representantes si existe autorización.", google_search_url(f"Registro de Empresas y Sociedades {value}"))]}
     if transform_id == "cl.dork.generate":
-        return {"entities": _dork_entities(generate_dorks(input_type, value))}
+        return _generic_public_evidence(input_type, value)
     if transform_id == "cl.source.diario_oficial.human":
         return {"human_tasks": [human_task("Diario Oficial", value)]}
     if transform_id == "cl.source.registro_empresas.human":
         return {"human_tasks": [human_task("Registro de Empresas y Sociedades", value)]}
+    if transform_id == "cl.rut.diario_oficial.human":
+        data = validate_rut(value)
+        normalized = data.get("normalized", value)
+        return {"human_tasks": [
+            human_task("Diario Oficial - publicaciones por RUT", normalized, "Buscar publicaciones, avisos, resoluciones o documentos indexados asociados al RUT; guardar sólo URL, fecha y extracto verificable.", google_search_url(f"site:diariooficial.interior.gob.cl {normalized}"), "El Diario Oficial puede no exponer API estable para esta consulta; se mantiene como revisión humana."),
+            human_task("Diario Oficial - variantes RUT", data.get("compact", value), "Revisar variantes sin puntos/guion para evitar falsos negativos, manteniendo trazabilidad de consulta.", google_search_url(f"site:diariooficial.interior.gob.cl {data.get('compact', value)}")),
+        ]}
+    if transform_id == "cl.rut.poder_judicial.human":
+        data = validate_rut(value)
+        normalized = data.get("normalized", value)
+        return {"human_tasks": [
+            human_task("Poder Judicial / Oficina Judicial Virtual", normalized, "Consultar sólo si existe base legítima y autorización aplicable; registrar rol, tribunal, fecha y extracto público si la fuente lo permite.", "https://oficinajudicialvirtual.pjud.cl/", "Fuente sensible con interacción, sesión/CAPTCHA y restricciones; no se automatiza."),
+            human_task("Poder Judicial indexado", normalized, "Buscar menciones públicas indexadas sin evadir controles ni autenticación.", google_search_url(f"site:pjud.cl {normalized}")),
+        ]}
+    if transform_id == "cl.phone.caller_id.human":
+        data = normalize_phone(value)
+        normalized = data.get("normalized", value)
+        return {"human_tasks": [
+            human_task("Caller ID/directorios autorizados", normalized, "Revisar manualmente servicios de identificación o directorios sólo si sus términos y la finalidad del caso lo permiten; no llamar ni enviar mensajes.", google_search_url(f"{normalized} caller ID Chile"), "Estos servicios suelen tener términos restrictivos, login o datos personales; se requiere operador."),
+            human_task("Búsqueda exacta de teléfono", normalized, "Buscar apariciones públicas exactas del teléfono y guardar URL/extracto verificable si existe.", google_search_url(f'"{normalized}" OR "{data.get("national", value)}" Chile')),
+        ]}
+    if transform_id == "cl.phone.denuncias_sernac_subtel.human":
+        data = normalize_phone(value)
+        normalized = data.get("normalized", value)
+        national = data.get("national", value)
+        return {"human_tasks": [
+            human_task("SERNAC documentos/reclamos indexados", normalized, "Buscar menciones públicas del teléfono en documentos, reclamos o alertas indexadas; no inferir titularidad sin evidencia.", google_search_url(f"site:sernac.cl ({normalized} OR {national})")),
+            human_task("Subtel documentos indexados", normalized, "Revisar documentos públicos de Subtel o portabilidad sólo por canales permitidos.", google_search_url(f"site:subtel.gob.cl ({normalized} OR {national})")),
+        ]}
+    if transform_id == "cl.plate.registro_civil.human":
+        normalized = normalize_plate(value)["normalized"]
+        return {"human_tasks": [
+            human_task("Registro Civil - certificado/anotaciones vehiculares", normalized, "Consultar certificados o anotaciones vehiculares sólo mediante canal autorizado, con operador y permisos aplicables; guardar extracto del certificado si procede.", google_search_url(f"Registro Civil certificado anotaciones vigentes patente {normalized}"), "No se automatizan trámites, pagos, sesiones ni CAPTCHA."),
+        ]}
+    if transform_id == "cl.plate.sernac.human":
+        normalized = normalize_plate(value)["normalized"]
+        return {"human_tasks": [
+            human_task("SERNAC / alertas o recalls vehiculares", normalized, "Revisar menciones públicas asociadas a la patente, modelo o recall si aparece en documentos; guardar sólo evidencia verificable.", google_search_url(f"site:sernac.cl {normalized} vehículo OR recall OR alerta")),
+            human_task("Documentos públicos de patente", normalized, "Buscar documentos públicos o remates asociados a patente sin usar scraping restrictivo.", google_search_url(f'"{normalized}" (patente OR vehículo OR remate OR multa) Chile')),
+        ]}
+    if transform_id == "cl.email.breach_check.human":
+        email = normalize_email(value).get("email", value)
+        return {"human_tasks": [
+            human_task("HaveIBeenPwned API/autorizada", email, "Consultar brechas sólo con API key autorizada o consentimiento aplicable; registrar fuente, fecha, breach y extracto permitido.", "https://haveibeenpwned.com/", "La API pública moderna requiere condiciones y/o credenciales; no se simula resultado."),
+            human_task("Búsqueda pública exacta de email", email, "Buscar apariciones públicas exactas del correo en fuentes indexadas y guardar evidencia real si existe.", google_search_url(f'"{email}"')),
+        ]}
+    if transform_id == "cl.name.linkedin.human":
+        clean = " ".join(value.strip().split())
+        return {"human_tasks": [
+            human_task("LinkedIn búsqueda manual", clean, "Buscar perfiles profesionales sólo desde sesión/operador autorizado y citar datos públicos observables; no automatizar login ni scraping.", google_search_url(f"site:linkedin.com/in {clean} Chile"), "LinkedIn bloquea automatización y requiere respetar términos; se conserva como HITL."),
+            human_task("Nombre en documentos públicos Chile", clean, "Buscar menciones del nombre en documentos públicos chilenos y capturar URL/extracto verificable.", google_search_url(f'"{clean}" filetype:pdf Chile')),
+        ]}
     raise ValueError(f"Transform no soportado: {transform_id}")

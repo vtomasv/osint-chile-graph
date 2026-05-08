@@ -36,7 +36,9 @@ import {
   type FindingsReport,
   type GraphEdge,
   type GraphNode,
+  type EvidenceItem,
   type HumanTaskItem,
+  type SourceStatusItem,
   type Transform,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -62,6 +64,7 @@ const findingTabs = [
   { id: "visual", label: "Visualizaciones" },
   { id: "relationships", label: "Relaciones" },
   { id: "evidence", label: "Evidencias" },
+  { id: "sources", label: "Fuentes" },
   { id: "runs", label: "Transforms" },
   { id: "timeline", label: "Timeline" },
 ] as const;
@@ -116,6 +119,44 @@ function formatProperties(properties: Record<string, unknown>) {
     .join(" · ");
 }
 
+function evidenceBadge(evidence: EvidenceItem) {
+  const kind = evidence.evidence_kind || String(evidence.properties?.evidence_kind || "");
+  if (evidence.properties?.human_task_completed || kind === "operator_captured_evidence") {
+    return { label: "captura HITL", classes: "border-[#d49b4a]/55 text-[#e6c27a] bg-[#d49b4a]/8" };
+  }
+  if (evidence.is_verified_osint || kind.includes("verified") || evidence.source_url) {
+    return { label: "OSINT verificado", classes: "border-[#81a684]/55 text-[#9fc7a1] bg-[#81a684]/8" };
+  }
+  if (kind === "local_algorithm" || evidence.source_name.startsWith("local_algorithm:")) {
+    return { label: "algoritmo local", classes: "border-[#c7b68b]/50 text-[#c7b68b] bg-[#c7b68b]/8" };
+  }
+  return { label: "no clasificado", classes: "border-[#597060]/50 text-[#a9b5a6] bg-black/20" };
+}
+
+function sourceStatusBadge(status: string) {
+  if (["verified_evidence", "verified", "automated_success"].includes(status)) {
+    return { label: "evidencia verificada", classes: "border-[#81a684]/60 text-[#9fc7a1] bg-[#81a684]/8" };
+  }
+  if (["operator_required", "hitl_required"].includes(status)) {
+    return { label: "requiere HITL", classes: "border-[#d49b4a]/60 text-[#e6c27a] bg-[#d49b4a]/8" };
+  }
+  if (["blocked_or_unavailable", "blocked", "timeout", "error"].includes(status)) {
+    return { label: "sin acceso automatizado", classes: "border-[#b76f52]/60 text-[#ffb197] bg-[#b76f52]/8" };
+  }
+  if (["no_results", "no_result"].includes(status)) {
+    return { label: "sin resultados", classes: "border-[#c7b68b]/50 text-[#c7b68b] bg-[#c7b68b]/8" };
+  }
+  return { label: status || "sin estado", classes: "border-[#597060]/50 text-[#a9b5a6] bg-black/20" };
+}
+
+function sourceStatusSummary(statuses: SourceStatusItem[]) {
+  return statuses.reduce<Record<string, number>>((acc, item) => {
+    const key = sourceStatusBadge(item.status).label;
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+}
+
 function graphLayout(nodes: GraphNode[]) {
   const centerX = 440;
   const centerY = 240;
@@ -143,34 +184,45 @@ function parseObservedEntities(text: string) {
     });
 }
 
-const demoNodes: GraphNode[] = [
-  { id: "seed-rut-demo", type: "Seed", label: "RUT 12.345.678-5", value: "12.345.678-5", confidence: 0.92, properties: { normalized: "12345678-5", category: "rut" } },
-  { id: "person-demo", type: "Person", label: "Persona objetivo", value: "persona-demo", confidence: 0.68, properties: { inferred_from: "RUT", needs_human_confirmation: true } },
-  { id: "phone-demo", type: "Phone", label: "+56 9 8765 4321", value: "+56987654321", confidence: 0.71, properties: { format: "E.164 Chile", carrier_pending_hitl: true } },
-  { id: "plate-demo", type: "Plate", label: "ABCD12", value: "ABCD12", confidence: 0.63, properties: { format: "patente nueva", vehicle_query_pending: true } },
-  { id: "hitl-demo", type: "HumanTask", label: "Consultar fuente autorizada", value: "RUT 12.345.678-5", confidence: 0.5, properties: { source: "Fuente pública/autorizada", search_url: "https://www.google.com/search?q=12.345.678-5", purpose: "Verificar coincidencias y capturar evidencia manual." } },
-];
-
-const demoEdges: GraphEdge[] = [
-  { id: "e1", source: "seed-rut-demo", target: "person-demo", type: "IDENTIFIES_CANDIDATE", confidence: 0.68, properties: {} },
-  { id: "e2", source: "person-demo", target: "phone-demo", type: "POSSIBLE_CONTACT", confidence: 0.61, properties: {} },
-  { id: "e3", source: "person-demo", target: "plate-demo", type: "POSSIBLE_VEHICLE", confidence: 0.56, properties: {} },
-  { id: "e4", source: "seed-rut-demo", target: "hitl-demo", type: "REQUIRES_HUMAN", confidence: 0.5, properties: {} },
-];
-
-function createDemoReport(): FindingsReport {
+function createUnavailableReport(): FindingsReport {
   return {
-    investigation: { id: "demo", title: "Expediente demo — RUT 12.345.678-5", objective: "Vista demostrativa offline. Levanta la API local para persistir datos reales del objetivo.", status: "demo" },
-    summary: { entities: demoNodes.length, relationships: demoEdges.length, evidence: 2, human_tasks: 1, pending_human_tasks: 1, transform_runs: 3, average_confidence: 0.69, entity_types: { Seed: 1, Person: 1, Phone: 1, Plate: 1, HumanTask: 1 }, evidence_by_source: { demo: 2 } },
-    analysis: { mode: "demo_local", executive_summary: "El expediente agrupa el RUT consultado con posibles datos asociados, separando hechos confirmados, hipótesis y tareas humanas pendientes. La prioridad operativa es validar manualmente las fuentes autorizadas, capturar evidencia verificable y convertir las observaciones en nodos relacionados.", key_findings: ["El RUT fue normalizado y queda disponible como entidad pivote.", "Existen entidades asociadas de ejemplo para demostrar teléfono, patente y persona.", "La tarea HITL muestra cómo continuar una revisión humana y guardar evidencia estructurada."], gaps: ["No hay confirmación oficial porque la API local no está conectada en esta vista.", "Las relaciones demo deben reemplazarse por evidencia real obtenida desde transformaciones y fuentes autorizadas."], recommended_next_steps: ["Levantar backend con Docker Compose o API local.", "Ejecutar transformaciones de RUT, teléfono y patente.", "Abrir tareas HITL, capturar extractos y guardar entidades observadas."], entity_type_distribution: { Seed: 1, Person: 1, Phone: 1, Plate: 1, HumanTask: 1 }, ai_status: "Narrativa demostrativa local; no reemplaza la verificación de fuentes." },
-    entities: demoNodes,
-    entity_profiles: demoNodes.map((entity) => ({ entity, analysis: { title: entity.label, summary: `${entity.label} aparece como entidad del expediente. Revisa relaciones, evidencia y tareas pendientes antes de considerarlo confirmado.`, facts: [`Tipo: ${entity.type}`, `Valor: ${entity.value}`], gaps: ["Requiere validación con fuentes autorizadas."], next_steps: ["Ejecutar transformaciones relacionadas y guardar evidencia HITL."], mode: "demo" }, relationships: [], evidence: [], stats: { relationships: demoEdges.filter((edge) => edge.source === entity.id || edge.target === entity.id).length, evidence: entity.type === "Seed" ? 1 : 0, human_tasks: entity.type === "HumanTask" ? 1 : 0, confidence: entity.confidence } })),
-    relationships: demoEdges.map((edge) => ({ id: edge.id, type: edge.type, source_id: edge.source, source_label: demoNodes.find((node) => node.id === edge.source)?.label || edge.source, source_type: demoNodes.find((node) => node.id === edge.source)?.type, target_id: edge.target, target_label: demoNodes.find((node) => node.id === edge.target)?.label || edge.target, target_type: demoNodes.find((node) => node.id === edge.target)?.type, properties: edge.properties, confidence: edge.confidence })),
-    evidence: [{ id: "ev-demo-1", source_name: "demo", source_url: "", extract: "RUT normalizado en formato chileno y preparado para transformaciones derivadas.", confidence: 0.75, properties: { demo: true }, created_at: new Date().toISOString() }, { id: "ev-demo-2", source_name: "demo", source_url: "", extract: "La relación con teléfono y patente se presenta como hipótesis de demostración hasta capturar evidencia humana.", confidence: 0.52, properties: { demo: true }, created_at: new Date().toISOString() }],
-    human_tasks: [demoNodes[4] as HumanTaskItem],
-    runs: [{ id: "run-demo-1", transform_id: "cl.rut.normalize", input_type: "rut", input_value: "12.345.678-5", created_at: new Date().toISOString(), output_summary: { entities: 1, human_tasks: 0, relationships: 0 } }, { id: "run-demo-2", transform_id: "cl.rut.open_sources.hitl", input_type: "rut", input_value: "12.345.678-5", created_at: new Date().toISOString(), output_summary: { entities: 1, human_tasks: 1, relationships: 1 } }],
-    timeline: [{ at: new Date().toISOString(), kind: "demo", title: "Expediente inicializado", detail: "Vista offline con datos demostrativos para revisar la experiencia de análisis.", confidence: 0.7 }],
-    visualizations: { treemap: [{ name: "Seed", size: 1 }, { name: "Person", size: 1 }, { name: "Phone", size: 1 }, { name: "Plate", size: 1 }, { name: "HumanTask", size: 1 }], sankey: { nodes: [{ name: "cl.rut.normalize" }, { name: "cl.rut.open_sources.hitl" }, { name: "Seed" }, { name: "HumanTask" }], links: [{ source: 0, target: 2, value: 1 }, { source: 1, target: 3, value: 1 }] }, semantic_clusters: [{ name: "identidad", count: 2, avg_confidence: 0.72, examples: [] }, { name: "contacto", count: 1, avg_confidence: 0.71, examples: [] }, { name: "vehículo", count: 1, avg_confidence: 0.63, examples: [] }] },
+    investigation: {
+      id: "api-unavailable",
+      title: "Demo desactivado — sin evidencia OSINT cargada",
+      objective: "Demo desactivado: la interfaz no mostrará datos ficticios. Levanta la API y ejecuta transformaciones para obtener evidencia verificable o tareas HITL reales.",
+      status: "api_unavailable",
+    },
+    summary: {
+      entities: 0,
+      relationships: 0,
+      evidence: 0,
+      evidence_total_records: 0,
+      source_statuses: 0,
+      human_tasks: 0,
+      pending_human_tasks: 0,
+      transform_runs: 0,
+      average_confidence: 0,
+      entity_types: {},
+      evidence_by_source: {},
+    },
+    analysis: {
+      mode: "api_unavailable",
+      executive_summary: "Demo desactivado. No hay expediente cargado porque la API no respondió. Para evitar una máscara falsa de OSINT, esta vista queda vacía hasta recibir evidencias reales, registros locales declarados o tareas humanas generadas por el backend.",
+      key_findings: ["Sin evidencia OSINT real cargada en esta sesión."],
+      gaps: ["Levantar backend y ejecutar transformaciones contra fuentes autorizadas.", "Completar tareas HITL para fuentes que no permitan automatización responsable."],
+      recommended_next_steps: ["Verificar Docker Compose/API local.", "Agregar una semilla real y ejecutar una transformación.", "Revisar estados de fuente y capturar evidencia humana cuando corresponda."],
+      entity_type_distribution: {},
+      ai_status: "No se generó narrativa AI sobre datos ficticios.",
+    },
+    entities: [],
+    entity_profiles: [],
+    relationships: [],
+    evidence: [],
+    source_statuses: [],
+    human_tasks: [],
+    runs: [],
+    timeline: [{ at: new Date().toISOString(), kind: "demo_disabled", title: "Demo desactivado", detail: "No se cargaron datos demostrativos ni evidencia falsa.", confidence: 0 }],
+    visualizations: { treemap: [], sankey: { nodes: [], links: [] }, semantic_clusters: [] },
   };
 }
 
@@ -383,10 +435,11 @@ function FindingsPanel({ report, activeTab, setActiveTab, selectedEntityId, setS
             <Button onClick={onRefresh} className="rounded-none border border-[#597060]/60 bg-black/20 text-[#f1ead9] hover:bg-[#597060]/25"><RefreshCw className="mr-2 h-4 w-4" />Refrescar</Button>
           </div>
         </div>
-        <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
           <FindingMetric icon={Target} label="Entidades" value={report.summary.entities} />
           <FindingMetric icon={GitBranch} label="Relaciones" value={report.summary.relationships} />
-          <FindingMetric icon={FileText} label="Evidencias" value={report.summary.evidence} />
+          <FindingMetric icon={FileText} label="Evidencias verificadas" value={report.summary.evidence} />
+          <FindingMetric icon={Database} label="Estados fuente" value={report.summary.source_statuses ?? report.source_statuses?.length ?? 0} />
           <FindingMetric icon={AlertTriangle} label="HITL pendientes" value={report.summary.pending_human_tasks ?? report.summary.human_tasks} />
           <FindingMetric icon={Activity} label="Transforms" value={report.summary.transform_runs} />
           <FindingMetric icon={ShieldCheck} label="Confianza media" value={formatConfidence(report.summary.average_confidence)} />
@@ -411,6 +464,16 @@ function FindingsPanel({ report, activeTab, setActiveTab, selectedEntityId, setS
             <article className="border border-[#597060]/35 bg-black/20 p-6">
               <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.22em] text-[#81a684]">Hallazgos clave</p>
               <div className="space-y-3">{(report.analysis?.key_findings || []).map((item) => <p key={item} className="border-l border-[#d49b4a]/55 bg-[#d49b4a]/8 p-3 text-sm leading-relaxed text-[#f1ead9]">{item}</p>)}</div>
+            </article>
+            <article className="xl:col-span-2 border border-[#597060]/35 bg-black/20 p-6">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-[#81a684]">Control de fuentes</p>
+                  <h4 className="font-display text-2xl text-[#f1ead9]">Qué se consultó, qué fue bloqueado y qué requiere operador</h4>
+                </div>
+                <span className="border border-[#597060]/45 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-[#c7b68b]">sin datos simulados</span>
+              </div>
+              <SourceStatusPanel report={report} compact />
             </article>
             <article className="border border-[#597060]/35 bg-black/20 p-6">
               <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.22em] text-[#81a684]">Brechas</p>
@@ -439,7 +502,7 @@ function FindingsPanel({ report, activeTab, setActiveTab, selectedEntityId, setS
                 </div>
                 <div className="mt-6 grid gap-4 xl:grid-cols-2">
                   <div><p className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[#e6c27a]">Relaciones directas</p><div className="max-h-72 space-y-2 overflow-auto">{selectedProfile.relationships.map((rel) => <p key={rel.id} className="border-l border-[#d49b4a]/55 bg-black/20 p-3 text-sm text-[#d2d0c7]">{rel.source_label} <span className="font-mono text-[#e6c27a]">{rel.type}</span> {rel.target_label}</p>)}</div></div>
-                  <div><p className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[#e6c27a]">Evidencias asociadas</p><div className="max-h-72 space-y-2 overflow-auto">{selectedProfile.evidence.map((ev) => <p key={ev.id} className="border-l border-[#81a684]/55 bg-black/20 p-3 text-sm text-[#d2d0c7]">{ev.extract}</p>)}</div></div>
+                  <div><p className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[#e6c27a]">Evidencias asociadas</p><div className="max-h-72 space-y-2 overflow-auto">{selectedProfile.evidence.length ? selectedProfile.evidence.map((ev) => <EvidenceCard key={ev.id} evidence={ev} compact />) : <p className="border border-[#597060]/25 bg-[#101817]/80 p-3 text-sm text-[#a9b5a6]">Esta ficha aún no tiene evidencia OSINT verificada asociada. Ejecuta transforms con conectores reales o completa una tarea HITL.</p>}</div></div>
                 </div>
               </article>
             ) : <p className="text-sm text-[#a9b5a6]">Sin entidades para perfilar.</p>}
@@ -458,6 +521,7 @@ function FindingsPanel({ report, activeTab, setActiveTab, selectedEntityId, setS
 
         {activeTab === "relationships" && <RelationshipTable relationships={report.relationships} />}
         {activeTab === "evidence" && <EvidenceList report={report} />}
+        {activeTab === "sources" && <SourceStatusPanel report={report} />}
         {activeTab === "runs" && <RunsTable report={report} />}
         {activeTab === "timeline" && <TimelineList report={report} />}
       </div>
@@ -470,7 +534,83 @@ function RelationshipTable({ relationships }: { relationships: FindingRelationsh
 }
 
 function EvidenceList({ report }: { report: FindingsReport }) {
-  return <div className="space-y-3">{report.evidence.map((evidence) => <article key={evidence.id} className="border border-[#597060]/35 bg-black/20 p-4"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#e6c27a]">{evidence.source_name}</span><span className={`border px-2 py-1 font-mono text-[10px] ${confidenceTone(evidence.confidence)}`}>{formatConfidence(evidence.confidence)}</span></div><p className="text-sm leading-relaxed text-[#d2d0c7]">{evidence.extract}</p>{evidence.source_url && <a href={evidence.source_url} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center font-mono text-[11px] text-[#81a684] hover:text-[#e6c27a]"><ExternalLink className="mr-2 h-3 w-3" />{evidence.source_url}</a>}<p className="mt-3 font-mono text-[11px] text-[#81a684]">{new Date(evidence.created_at).toLocaleString("es-CL")}</p><p className="mt-2 text-xs text-[#a9b5a6]">{formatProperties(evidence.properties)}</p></article>)}</div>;
+  if (!report.evidence.length) {
+    return (
+      <div className="grid gap-4 xl:grid-cols-[1fr_.9fr]">
+        <div className="border border-[#597060]/35 bg-black/20 p-5">
+          <div className="mb-3 flex items-center gap-3"><ShieldCheck className="h-5 w-5 text-[#d49b4a]" /><h4 className="font-display text-xl text-[#f1ead9]">Sin evidencia OSINT verificada</h4></div>
+          <p className="text-sm leading-relaxed text-[#a9b5a6]">El backend no devuelve registros ficticios. Si un conector falló, quedó en “Fuentes”; si una fuente requiere navegador humano, completa la tarea HITL para convertirla en evidencia citable.</p>
+        </div>
+        <SourceStatusPanel report={report} compact />
+      </div>
+    );
+  }
+
+  return <div className="space-y-3">{report.evidence.map((evidence) => <EvidenceCard key={evidence.id} evidence={evidence} />)}</div>;
+}
+
+function EvidenceCard({ evidence, compact = false }: { evidence: EvidenceItem; compact?: boolean }) {
+  const badge = evidenceBadge(evidence);
+  return (
+    <article className={`border border-[#597060]/35 bg-black/20 ${compact ? "p-3" : "p-4"}`}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#e6c27a]">{evidence.source_name}</span>
+          <span className={`border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] ${badge.classes}`}>{badge.label}</span>
+        </div>
+        <span className={`border px-2 py-1 font-mono text-[10px] ${confidenceTone(evidence.confidence)}`}>{formatConfidence(evidence.confidence)}</span>
+      </div>
+      <p className="text-sm leading-relaxed text-[#d2d0c7]">{evidence.extract || "Evidencia sin extracto textual; revisar metadatos antes de citar."}</p>
+      {evidence.source_url && <a href={evidence.source_url} target="_blank" rel="noreferrer" className="mt-3 inline-flex break-all font-mono text-[11px] text-[#81a684] hover:text-[#e6c27a]"><ExternalLink className="mr-2 mt-0.5 h-3 w-3 shrink-0" />{evidence.source_url}</a>}
+      <p className="mt-3 font-mono text-[11px] text-[#81a684]">{new Date(evidence.created_at).toLocaleString("es-CL")}</p>
+      {!compact && <p className="mt-2 text-xs text-[#a9b5a6]">{formatProperties(evidence.properties)}</p>}
+    </article>
+  );
+}
+
+function SourceStatusPanel({ report, compact = false }: { report: FindingsReport; compact?: boolean }) {
+  const statuses = report.source_statuses || [];
+  const grouped = sourceStatusSummary(statuses);
+
+  if (!statuses.length) {
+    return (
+      <div className="border border-[#597060]/35 bg-black/20 p-5">
+        <div className="mb-3 flex items-center gap-3"><Database className="h-5 w-5 text-[#d49b4a]" /><h4 className="font-display text-xl text-[#f1ead9]">Sin estados de fuente registrados</h4></div>
+        <p className="text-sm leading-relaxed text-[#a9b5a6]">Aún no se han ejecutado conectores que reporten fuentes consultadas. Esta ausencia no se rellena con datos demo: ejecuta un transform real o genera tareas HITL para que el expediente indique qué pasó con cada fuente.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {Object.entries(grouped).map(([label, count]) => (
+          <div key={label} className="border border-[#597060]/30 bg-[#101817]/70 p-3 font-mono text-[10px] uppercase tracking-[0.14em] text-[#c7b68b]">
+            <strong className="mr-2 text-lg text-[#f1ead9]">{count}</strong>{label}
+          </div>
+        ))}
+      </div>
+      <div className={`grid gap-3 ${compact ? "max-h-80 overflow-auto pr-1" : ""}`}>
+        {statuses.map((item, index) => {
+          const badge = sourceStatusBadge(item.status);
+          return (
+            <article key={`${item.run_id || item.source}-${index}`} className="border border-[#597060]/35 bg-black/20 p-4">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#e6c27a]">{item.source}</p>
+                  <p className="mt-1 font-mono text-[10px] text-[#81a684]">{item.transform_id || "transform no informado"} · {item.input_type || "input"}={item.input_value || item.query || "—"}</p>
+                </div>
+                <span className={`border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] ${badge.classes}`}>{badge.label}</span>
+              </div>
+              <p className="text-sm leading-relaxed text-[#d2d0c7]">{item.message || item.reason || "Estado de fuente registrado sin mensaje adicional."}</p>
+              {item.url && <a href={item.url} target="_blank" rel="noreferrer" className="mt-3 inline-flex break-all font-mono text-[11px] text-[#81a684] hover:text-[#e6c27a]"><ExternalLink className="mr-2 mt-0.5 h-3 w-3 shrink-0" />{item.url}</a>}
+              <p className="mt-3 font-mono text-[10px] text-[#a9b5a6]">consulta: {item.checked_at ? new Date(item.checked_at).toLocaleString("es-CL") : "sin timestamp"} · corrida: {item.created_at ? new Date(item.created_at).toLocaleString("es-CL") : "sin timestamp"}</p>
+            </article>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function RunsTable({ report }: { report: FindingsReport }) {
@@ -506,10 +646,10 @@ export default function Home() {
       if (!selectedEntityId && report.entity_profiles?.[0]) setSelectedEntityId(report.entity_profiles[0].entity.id);
       if (!selectedTaskId && report.human_tasks?.[0]) setSelectedTaskId(report.human_tasks[0].id);
     } catch {
-      const demo = createDemoReport();
-      setFindings(demo);
-      if (!selectedEntityId && demo.entity_profiles?.[0]) setSelectedEntityId(demo.entity_profiles[0].entity.id);
-      if (!selectedTaskId && demo.human_tasks?.[0]) setSelectedTaskId(demo.human_tasks[0].id);
+      const unavailable = createUnavailableReport();
+      setFindings(unavailable);
+      setSelectedEntityId(null);
+      setSelectedTaskId(null);
     }
   }, [selectedEntityId, selectedTaskId]);
 
@@ -519,8 +659,8 @@ export default function Home() {
       setGraphNodes(graph.nodes);
       setGraphEdges(graph.edges);
     } catch {
-      setGraphNodes(demoNodes);
-      setGraphEdges(demoEdges);
+      setGraphNodes([]);
+      setGraphEdges([]);
     }
   }, []);
 
@@ -529,8 +669,8 @@ export default function Home() {
   }, [refreshGraph, refreshFindings]);
 
   useEffect(() => {
-    api.health().then((data) => setHealth(`${data.status} · ${data.ai_provider}`)).catch(() => setHealth("api offline · demo local"));
-    api.transforms().then((items) => { setTransforms(items); setSelectedTransform(items[0]?.id || "cl.rut.normalize"); }).catch(() => { setTransforms([{ id: "cl.rut.normalize", name: "Normalizar RUT", description: "Transformación demo disponible cuando la API no está levantada.", input_types: ["rut"], output_types: ["Seed"], execution_mode: "automatic", risk_level: "low", requires_human: false, source_policy: "demo" }, { id: "cl.rut.open_sources.hitl", name: "Revisión humana de fuentes", description: "Abre una compuerta HITL para capturar evidencia manual.", input_types: ["rut"], output_types: ["HumanTask"], execution_mode: "human_in_the_loop", risk_level: "medium", requires_human: true, source_policy: "human" }]); setLog((current) => ["API no disponible: usando catálogo demo local para previsualizar expediente.", ...current]); });
+    api.health().then((data) => setHealth(`${data.status} · ${data.ai_provider}`)).catch(() => setHealth("api offline · sin datos"));
+    api.transforms().then((items) => { setTransforms(items); setSelectedTransform(items[0]?.id || "cl.rut.normalize"); }).catch(() => { setTransforms([{ id: "cl.rut.normalize", name: "Normalizar RUT", description: "API no disponible: catálogo informativo, no ejecuta OSINT sin backend.", input_types: ["rut"], output_types: ["Seed"], execution_mode: "automatic", risk_level: "low", requires_human: false, source_policy: "demo" }, { id: "cl.rut.open_sources.hitl", name: "Revisión humana de fuentes", description: "Abre una compuerta HITL para capturar evidencia manual.", input_types: ["rut"], output_types: ["HumanTask"], execution_mode: "human_in_the_loop", risk_level: "medium", requires_human: true, source_policy: "human" }]); setLog((current) => ["API no disponible: no se muestran datos ficticios; levanta el backend para ejecutar OSINT real.", ...current]); });
     refreshWorkspace().catch(() => undefined);
   }, [refreshWorkspace]);
 

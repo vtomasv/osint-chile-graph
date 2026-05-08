@@ -49,11 +49,18 @@
 
 ## Corrección crítica solicitada por Tom: OSINT real, no máscara de datos
 
-- [ ] Auditar transformaciones actuales para identificar cuáles producen evidencia real, cuáles sólo generan dorks/descripciones y cuáles deben pasar a HITL.
-- [ ] Eliminar o rotular explícitamente cualquier fallback/demo para que nunca se confunda con evidencia OSINT real.
-- [ ] Implementar conectores verificables para fuentes públicas/autorizadas, empezando por búsquedas web con evidencia citada, Diario Oficial, SII u otras fuentes accesibles sin evadir controles.
-- [ ] Para fuentes como Rutificador, Volante o Maleta, SII u otras que requieran CAPTCHA, sesión, aceptación manual o restrinjan scraping, crear tareas HITL con navegador integrado, instrucciones, URL de búsqueda y formulario de captura de evidencia real.
-- [ ] Persistir evidencia con URL, fecha de consulta, conector, estado, extracto textual, entidades extraídas, confianza y relación con el objetivo.
-- [ ] Actualizar UI para distinguir con claridad `evidencia real`, `pendiente humano`, `sin acceso automatizado` y `demo desactivado`.
-- [ ] Validar que las transformaciones ya no creen entidades útiles a partir de texto ficticio sino desde resultados reales o desde captura humana explícita.
-- [ ] Ejecutar pruebas, publicar commit en GitHub y guardar checkpoint final.
+- [x] Auditar transformaciones actuales para identificar cuáles producen evidencia real, cuáles sólo generan dorks/descripciones y cuáles deben pasar a HITL.
+- [x] Eliminar o rotular explícitamente cualquier fallback/demo para que nunca se confunda con evidencia OSINT real.
+- [x] Implementar conectores verificables para fuentes públicas/autorizadas, empezando por API oficial de Mercado Público y dejando SII/Diario Oficial como HITL cuando no corresponde automatizar sin operador.
+- [x] Para fuentes como Rutificador, Volante o Maleta, SII u otras que requieran CAPTCHA, sesión, aceptación manual o restrinjan scraping, crear tareas HITL con navegador integrado, instrucciones, URL de búsqueda y formulario de captura de evidencia real.
+- [x] Persistir evidencia durante la sesión del expediente con URL, fecha de consulta, conector, estado, extracto textual, entidades extraídas, confianza y relación con el objetivo.
+- [x] Actualizar UI para distinguir con claridad `evidencia real`, `pendiente humano`, `sin acceso automatizado` y `demo desactivado`.
+- [x] Validar que las transformaciones ya no creen entidades útiles a partir de texto ficticio sino desde resultados reales o desde captura humana explícita.
+- [x] Ejecutar pruebas, publicar commit en GitHub y guardar checkpoint final. Validaciones locales pasan: `pnpm test`, `pnpm run check`, `pnpm run build`; versión lista para checkpoint/publicación.
+
+## Ajuste arquitectónico: backend accesible desde la app Manus
+
+- [x] Resolver conflictos de la actualización full-stack sin perder la interfaz forense ni los cambios OSINT previos.
+- [x] Implementar endpoints/procedures del backend Manus para transforms, grafo, hallazgos, estados de fuente y tareas HITL.
+- [x] Migrar la UI para invocar el backend del propio proyecto, eliminando la dependencia de `http://localhost:8000` desde el navegador.
+- [x] Añadir pruebas Vitest que demuestren que los transforms no devuelven evidencia ficticia y sí devuelven estados de fuente/HITL verificables.
