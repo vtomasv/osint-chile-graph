@@ -125,6 +125,101 @@ def run_transform(payload: TransformRunRequest):
     return {"run_id": run_id, "output": output, "created_entities": created_entities, "created_edges": created_edges}
 
 
+@app.get("/api/investigations/{investigation_id}/findings")
+def get_investigation_findings(investigation_id: str):
+    with session_scope() as session:
+        investigation = session.get(Investigation, investigation_id)
+        if not investigation:
+            raise HTTPException(status_code=404, detail="Investigación no encontrada")
+        entities = session.scalars(select(Entity).where(Entity.investigation_id == investigation_id).order_by(Entity.type.asc(), Entity.label.asc())).all()
+        relationships = session.scalars(select(Relationship).where(Relationship.investigation_id == investigation_id)).all()
+        evidence_rows = session.scalars(select(Evidence).where(Evidence.investigation_id == investigation_id).order_by(Evidence.created_at.desc())).all()
+        runs = session.scalars(select(TransformRun).where(TransformRun.investigation_id == investigation_id).order_by(TransformRun.created_at.desc())).all()
+
+        entity_lookup = {entity.id: entity for entity in entities}
+        human_tasks = [entity for entity in entities if entity.type == "HumanTask"]
+        evidence_by_source = {}
+        for evidence in evidence_rows:
+            evidence_by_source.setdefault(evidence.source_name, 0)
+            evidence_by_source[evidence.source_name] += 1
+
+        entity_types: dict[str, int] = {}
+        confidence_sum = 0.0
+        for entity in entities:
+            entity_types[entity.type] = entity_types.get(entity.type, 0) + 1
+            confidence_sum += entity.confidence or 0
+
+        run_items = [
+            {
+                "id": run.id,
+                "transform_id": run.transform_id,
+                "input_type": run.input_type,
+                "input_value": run.input_value,
+                "created_at": run.created_at.isoformat(),
+                "output_summary": {
+                    "entities": len((run.output or {}).get("entities", [])),
+                    "human_tasks": len((run.output or {}).get("human_tasks", [])),
+                    "relationships": len((run.output or {}).get("relationships", [])),
+                },
+            }
+            for run in runs
+        ]
+
+        timeline = []
+        for evidence in evidence_rows:
+            timeline.append({"at": evidence.created_at.isoformat(), "kind": "evidence", "title": evidence.source_name, "detail": evidence.extract, "confidence": evidence.confidence})
+        for run in runs:
+            timeline.append({"at": run.created_at.isoformat(), "kind": "transform", "title": run.transform_id, "detail": f"{run.input_type}={run.input_value}", "confidence": 1.0})
+        timeline = sorted(timeline, key=lambda item: item["at"], reverse=True)[:80]
+
+        relationship_items = [
+            {
+                "id": rel.id,
+                "type": rel.type,
+                "source_id": rel.source_id,
+                "source_label": entity_lookup.get(rel.source_id).label if entity_lookup.get(rel.source_id) else rel.source_id,
+                "target_id": rel.target_id,
+                "target_label": entity_lookup.get(rel.target_id).label if entity_lookup.get(rel.target_id) else rel.target_id,
+                "properties": rel.properties or {},
+                "confidence": rel.confidence,
+            }
+            for rel in relationships
+        ]
+
+        evidence_items = [
+            {
+                "id": evidence.id,
+                "source_name": evidence.source_name,
+                "source_url": evidence.source_url,
+                "extract": evidence.extract,
+                "confidence": evidence.confidence,
+                "properties": evidence.properties or {},
+                "created_at": evidence.created_at.isoformat(),
+            }
+            for evidence in evidence_rows
+        ]
+
+        return {
+            "investigation": {"id": investigation.id, "title": investigation.title, "objective": investigation.objective, "status": investigation.status, "created_at": investigation.created_at.isoformat()},
+            "summary": {
+                "entities": len(entities),
+                "relationships": len(relationships),
+                "evidence": len(evidence_rows),
+                "human_tasks": len(human_tasks),
+                "transform_runs": len(runs),
+                "average_confidence": round(confidence_sum / len(entities), 3) if entities else 0,
+                "entity_types": entity_types,
+                "evidence_by_source": evidence_by_source,
+            },
+            "entities": [{"id": n.id, "type": n.type, "label": n.label, "value": n.value, "properties": n.properties or {}, "confidence": n.confidence} for n in entities],
+            "relationships": relationship_items,
+            "evidence": evidence_items,
+            "human_tasks": [{"id": task.id, "label": task.label, "value": task.value, "properties": task.properties or {}, "confidence": task.confidence} for task in human_tasks],
+            "runs": run_items,
+            "timeline": timeline,
+        }
+
+
 @app.get("/api/graph/{investigation_id}", response_model=GraphOut)
 def get_graph(investigation_id: str):
     with session_scope() as session:

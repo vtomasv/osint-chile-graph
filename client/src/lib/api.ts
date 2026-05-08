@@ -44,6 +44,72 @@ export type GraphEdge = {
   confidence: number;
 };
 
+export type FindingRelationship = {
+  id: string;
+  type: string;
+  source_id: string;
+  source_label: string;
+  target_id: string;
+  target_label: string;
+  properties: Record<string, unknown>;
+  confidence: number;
+};
+
+export type EvidenceItem = {
+  id: string;
+  source_name: string;
+  source_url: string;
+  extract: string;
+  confidence: number;
+  properties: Record<string, unknown>;
+  created_at: string;
+};
+
+export type HumanTaskItem = {
+  id: string;
+  label: string;
+  value: string;
+  properties: Record<string, unknown>;
+  confidence: number;
+};
+
+export type TransformRunItem = {
+  id: string;
+  transform_id: string;
+  input_type: string;
+  input_value: string;
+  created_at: string;
+  output_summary: { entities: number; human_tasks: number; relationships: number };
+};
+
+export type TimelineItem = {
+  at: string;
+  kind: string;
+  title: string;
+  detail: string;
+  confidence: number;
+};
+
+export type FindingsReport = {
+  investigation: Investigation;
+  summary: {
+    entities: number;
+    relationships: number;
+    evidence: number;
+    human_tasks: number;
+    transform_runs: number;
+    average_confidence: number;
+    entity_types: Record<string, number>;
+    evidence_by_source: Record<string, number>;
+  };
+  entities: GraphNode[];
+  relationships: FindingRelationship[];
+  evidence: EvidenceItem[];
+  human_tasks: HumanTaskItem[];
+  runs: TransformRunItem[];
+  timeline: TimelineItem[];
+};
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
@@ -61,6 +127,7 @@ export const api = {
   investigations: () => request<Investigation[]>("/api/investigations"),
   transforms: () => request<Transform[]>("/api/transforms"),
   graph: (investigationId: string) => request<{ nodes: GraphNode[]; edges: GraphEdge[] }>(`/api/graph/${investigationId}`),
+  findings: (investigationId: string) => request<FindingsReport>(`/api/investigations/${investigationId}/findings`),
   addSeed: (payload: { investigation_id: string; input_type: string; value: string }) =>
     request<GraphNode>("/api/seeds", { method: "POST", body: JSON.stringify(payload) }),
   runTransform: (payload: { investigation_id: string; transform_id: string; input_type: string; value: string }) =>

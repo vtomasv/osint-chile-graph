@@ -22,3 +22,16 @@
 - [x] Validar que `pnpm build` siga pasando y que el artefacto final pueda resolver `express`; se simuló el runner con `dist`, `package.json` y `node_modules`, sirviendo HTML correctamente en `PORT=4173`.
 - [x] Crear commit bajo `vtomasv <vtomasv@gmail.com>` y publicar en GitHub (`85e4f15`, `main -> main`); queda pendiente guardar checkpoint final.
 - [ ] Entregar a Tom comandos de actualización, rebuild sin caché y verificación del contenedor frontend.
+
+## Solicitud de Tom: pantalla detallada de hallazgos y más transformaciones
+
+- [x] Inspeccionar `client/src/pages/Home.tsx`, componentes disponibles y contrato actual de datos: la UI consume `/api/transforms`, `/api/graph/{id}` y `/api/transforms/run`; el backend persiste evidencias y ejecuciones, pero todavía no las expone en un reporte detallado.
+- [x] Definir una pantalla/panel de resultados detallados con resumen ejecutivo, entidades, relaciones, evidencias, tareas HITL, línea de tiempo, confianza, fuente y trazabilidad; se implementará como módulo inferior conectado a un nuevo endpoint `/api/investigations/{id}/findings`.
+- [x] Ampliar el catálogo de transformaciones para RUT con validación, normalización, variaciones de búsqueda, dorks, vínculos societarios/HITL, documentos públicos/HITL y análisis de consistencia.
+- [x] Ampliar el catálogo de transformaciones para teléfono con normalización E.164 Chile, detección móvil/fijo, carrier/HITL, WhatsApp/HITL, dorks y vínculos por evidencia.
+- [x] Ampliar el catálogo de transformaciones para patente con normalización, formato antiguo/nuevo, consultas vehiculares/HITL, dorks, vínculos geográficos y evidencia manual.
+- [x] Agregar transformaciones transversales para email `.cl`, dominio, nombre/persona y empresa cuando el modelo actual lo permita.
+- [x] Implementar la UI respetando la estética forense actual, con panel detallado de hallazgos, tabs, métricas, tablas, badges de confianza, bitácora y resumen HITL.
+- [x] Validar TypeScript (`pnpm exec tsc --noEmit`), build de producción (`vite build` + `esbuild`), pruebas backend (`PYTHONPATH=apps/api python -m pytest apps/api/tests -q`) y revisar que `Dockerfile.frontend` mantenga las correcciones previas.
+- [ ] Crear commit, publicar en GitHub y guardar checkpoint final.
+- [ ] Entregar a Tom instrucciones de actualización y prueba local.
