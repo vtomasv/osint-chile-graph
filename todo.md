@@ -10,4 +10,4 @@
 - [x] Validar la configuración de Docker Compose por medios disponibles en el sandbox: Docker no está disponible aquí, pero el contexto de build fue corregido y queda documentada la prueba local.
 - [x] Actualizar README con instalación paso a paso en Apple M3 Max, Ollama local y troubleshooting.
 - [x] Confirmar estado de credenciales GitHub antes del push final.
-- [ ] Crear commit/checkpoint final limpio bajo `vtomasv <vtomasv@gmail.com>` y publicar si GitHub lo permite.
+- [x] Crear commit limpio bajo `vtomasv <vtomasv@gmail.com>` y publicar en GitHub: `0559e4e`.
