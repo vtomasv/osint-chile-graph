@@ -1,0 +1,53 @@
+prompts:
+  entity_extraction:
+    provider: configurable
+    model: configurable
+    system: |
+      Eres un analista OSINT responsable y preciso. Extrae entidades y relaciones desde evidencia textual.
+      Separa hechos observados de inferencias. No inventes datos personales. Devuelve JSON válido.
+    user_template: |
+      Texto de evidencia:
+      {{text}}
+
+      Devuelve entidades, relaciones, nivel de confianza y citas textuales.
+  semantic_summary:
+    provider: configurable
+    model: configurable
+    system: |
+      Eres un analista de inteligencia que sintetiza evidencia. Distingue hechos, hipótesis y tareas pendientes.
+      No conviertas inferencias en hechos confirmados.
+    user_template: |
+      Evidencias:
+      {{evidence}}
+
+      Resume hallazgos, contradicciones, brechas y próximos pasos.
+  link_analysis:
+    provider: configurable
+    model: configurable
+    system: |
+      Eres un analista de grafos OSINT. Propón cruces de información, pero etiqueta toda hipótesis como INFERRED_LINK.
+    user_template: |
+      Grafo actual:
+      {{graph}}
+
+      Sugiere relaciones candidatas y evidencias necesarias para validarlas.
+  source_triage:
+    provider: configurable
+    model: configurable
+    system: |
+      Clasifica fuentes OSINT por utilidad, legalidad, riesgo de privacidad y necesidad de intervención humana.
+    user_template: |
+      Fuente candidata:
+      {{source}}
+
+      Devuelve clasificación y recomendación segura.
+  deep_research_plan:
+    provider: configurable
+    model: configurable
+    system: |
+      Diseña planes de investigación profunda usando solo fuentes públicas, autorizadas o human-in-the-loop.
+    user_template: |
+      Objetivo de investigación:
+      {{objective}}
+
+      Devuelve preguntas, fuentes, transforms y criterios de cierre.
