@@ -21,7 +21,7 @@
 - [x] Corregir la imagen final del frontend agregando una etapa `prod-deps` con `pnpm prune --prod` y copiando `/app/node_modules` al runner.
 - [x] Validar que `pnpm build` siga pasando y que el artefacto final pueda resolver `express`; se simuló el runner con `dist`, `package.json` y `node_modules`, sirviendo HTML correctamente en `PORT=4173`.
 - [x] Crear commit bajo `vtomasv <vtomasv@gmail.com>` y publicar en GitHub (`85e4f15`, `main -> main`); queda pendiente guardar checkpoint final.
-- [ ] Entregar a Tom comandos de actualización, rebuild sin caché y verificación del contenedor frontend.
+- [x] Entregar a Tom comandos de actualización, rebuild sin caché y verificación del contenedor frontend; se consolidan en la entrega final actual.
 
 ## Solicitud de Tom: pantalla detallada de hallazgos y más transformaciones
 
@@ -34,7 +34,7 @@
 - [x] Implementar la UI respetando la estética forense actual, con panel detallado de hallazgos, tabs, métricas, tablas, badges de confianza, bitácora y resumen HITL.
 - [x] Validar TypeScript (`pnpm exec tsc --noEmit`), build de producción (`vite build` + `esbuild`), pruebas backend (`PYTHONPATH=apps/api python -m pytest apps/api/tests -q`) y revisar que `Dockerfile.frontend` mantenga las correcciones previas.
 - [x] Crear commit, publicar en GitHub y guardar checkpoint final (`99141e9` + checklist `6018941`, checkpoint `60189414`).
-- [ ] Entregar a Tom instrucciones de actualización y prueba local.
+- [x] Entregar a Tom instrucciones de actualización y prueba local; se consolidan en la entrega final actual.
 
 ## Nueva solicitud de Tom: expediente OSINT legible, AI y HITL accionable
 
@@ -45,7 +45,7 @@
 - [x] Implementar continuidad HITL: abrir/preview de fuentes cuando sea posible, formulario para capturar resultados humanos, guardar evidencia estructurada y asociarla al objetivo/entidad.
 - [x] Agregar visualizaciones de informe: grafo de relaciones, treemap de tipos de entidades/evidencias, Sankey de origen→transformación→hallazgo y relaciones semánticas agrupadas.
 - [x] Validar backend/frontend; falta publicar commit en GitHub y guardar checkpoint final.
-- [ ] Entregar a Tom instrucciones de uso y prueba del nuevo expediente.
+- [x] Entregar a Tom instrucciones de uso y prueba del nuevo expediente; se consolidan en la entrega final actual.
 
 ## Corrección crítica solicitada por Tom: OSINT real, no máscara de datos
 
