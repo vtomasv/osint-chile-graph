@@ -7,7 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
-import { serveStatic, setupVite } from "./vite";
+import { serveStatic } from "./static";
 import { registerOsintRoutes } from "../osintRoutes";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -48,6 +48,13 @@ async function startServer() {
   );
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
+    const importDevModule = new Function(
+      "specifier",
+      "return import(specifier)"
+    ) as (specifier: string) => Promise<typeof import("./vite")>;
+    const { setupVite } = await importDevModule(
+      new URL("./vite.ts", import.meta.url).href
+    );
     await setupVite(app, server);
   } else {
     serveStatic(app);

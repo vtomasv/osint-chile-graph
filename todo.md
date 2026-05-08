@@ -67,8 +67,8 @@
 
 ## Nuevo reporte de Tom: contenedores Docker fallan por dependencias runtime faltantes
 
-- [ ] Corregir Docker frontend: evitar que `dist/index.js` requiera `vite` ausente en dependencias de producción o incluirlo de forma segura en runtime.
-- [ ] Corregir Docker API Python: agregar `requests` a las dependencias instaladas para que `apps/api/app/osint_connectors.py` pueda importar correctamente.
-- [ ] Validar arranque de contenedores Docker y mantener evidencia OSINT sin datos simulados.
+- [x] Corregir Docker frontend: evitar que `dist/index.js` requiera `vite` ausente en dependencias de producción o incluirlo de forma segura en runtime.
+- [x] Corregir Docker API Python: agregar `requests` a las dependencias instaladas para que `apps/api/app/osint_connectors.py` pueda importar correctamente.
+- [x] Validar runtime equivalente al contenedor: pruebas, typecheck, build, runner de producción sin `vite` y API Python con `requests`; Docker CLI no está instalado en el sandbox, por lo que la validación real con `docker compose up --build` queda para el host de Tom.
 
 Contexto: bug reportado por Tom en `pasted_content_2.txt` con `ERR_MODULE_NOT_FOUND: Cannot find package 'vite'` y `ModuleNotFoundError: No module named 'requests'`.
