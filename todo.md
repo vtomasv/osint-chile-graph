@@ -35,3 +35,14 @@
 - [x] Validar TypeScript (`pnpm exec tsc --noEmit`), build de producción (`vite build` + `esbuild`), pruebas backend (`PYTHONPATH=apps/api python -m pytest apps/api/tests -q`) y revisar que `Dockerfile.frontend` mantenga las correcciones previas.
 - [x] Crear commit, publicar en GitHub y guardar checkpoint final (`99141e9` + checklist `6018941`, checkpoint `60189414`).
 - [ ] Entregar a Tom instrucciones de actualización y prueba local.
+
+## Nueva solicitud de Tom: expediente OSINT legible, AI y HITL accionable
+
+- [ ] Revisar el estado actual de la pantalla de hallazgos, endpoint `/findings`, modelos de DB y transformaciones para identificar por qué sólo aparecen logs poco útiles.
+- [ ] Crear una vista de expediente por entidad donde se pueda seleccionar un RUT, teléfono, patente, email, dominio, persona o empresa y ver todos sus datos asociados, relaciones, evidencias y tareas pendientes.
+- [ ] Agregar narrativas AI/locales de hallazgos por objetivo y por entidad, con explicación legible, hipótesis, vacíos de información y próximos pasos sugeridos.
+- [ ] Reemplazar el reporte de logs por secciones de valor: resumen del objetivo, fichas enriquecidas, relaciones, fuentes, confianza, timeline y matriz de hallazgos.
+- [ ] Implementar continuidad HITL: abrir/preview de fuentes cuando sea posible, formulario para capturar resultados humanos, guardar evidencia estructurada y asociarla al objetivo/entidad.
+- [ ] Agregar visualizaciones de informe: grafo de relaciones, treemap de tipos de entidades/evidencias, Sankey de origen→transformación→hallazgo y relaciones semánticas agrupadas.
+- [ ] Validar backend/frontend, publicar commit en GitHub y guardar checkpoint final.
+- [ ] Entregar a Tom instrucciones de uso y prueba del nuevo expediente.
