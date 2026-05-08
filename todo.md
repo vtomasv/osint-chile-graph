@@ -64,3 +64,11 @@
 - [x] Implementar endpoints/procedures del backend Manus para transforms, grafo, hallazgos, estados de fuente y tareas HITL.
 - [x] Migrar la UI para invocar el backend del propio proyecto, eliminando la dependencia de `http://localhost:8000` desde el navegador.
 - [x] Añadir pruebas Vitest que demuestren que los transforms no devuelven evidencia ficticia y sí devuelven estados de fuente/HITL verificables.
+
+## Nuevo reporte de Tom: contenedores Docker fallan por dependencias runtime faltantes
+
+- [ ] Corregir Docker frontend: evitar que `dist/index.js` requiera `vite` ausente en dependencias de producción o incluirlo de forma segura en runtime.
+- [ ] Corregir Docker API Python: agregar `requests` a las dependencias instaladas para que `apps/api/app/osint_connectors.py` pueda importar correctamente.
+- [ ] Validar arranque de contenedores Docker y mantener evidencia OSINT sin datos simulados.
+
+Contexto: bug reportado por Tom en `pasted_content_2.txt` con `ERR_MODULE_NOT_FOUND: Cannot find package 'vite'` y `ModuleNotFoundError: No module named 'requests'`.
