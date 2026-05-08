@@ -72,3 +72,4 @@
 - [x] Validar runtime equivalente al contenedor: pruebas, typecheck, build, runner de producción sin `vite` y API Python con `requests`; Docker CLI no está instalado en el sandbox, por lo que la validación real con `docker compose up --build` queda para el host de Tom.
 
 Contexto: bug reportado por Tom en `pasted_content_2.txt` con `ERR_MODULE_NOT_FOUND: Cannot find package 'vite'` y `ModuleNotFoundError: No module named 'requests'`.
+- [x] Añadir prueba Vitest de regresión para asegurar que el entrypoint de producción no importe `vite` estáticamente y que `serveStatic` viva en un módulo independiente.
