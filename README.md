@@ -144,6 +144,7 @@ Si el frontend carga pero no encuentra la API, confirma que el contenedor de API
 | IA responde con error de conexión | Ollama no está activo en macOS | Ejecuta `ollama serve` y prueba `curl http://localhost:11434/api/tags`. |
 | Neo4j Browser pide credenciales | Es el comportamiento normal | Usa `neo4j` y `osint_neo4j_password`, salvo que cambies `.env`. |
 | Build de API falla copiando prompts | Versión antigua del repositorio | Asegúrate de tener el Dockerfile corregido con contexto raíz en `docker-compose.yml`. |
+| `ERR_PNPM_PATCH_NOT_APPLIED` durante build del frontend | `Dockerfile.frontend` antiguo no copia `patches/` antes de `pnpm install` | Ejecuta `git pull --rebase origin main` y reconstruye con `docker compose build --no-cache frontend && docker compose up`. |
 | Puerto ocupado | Otro servicio usa el puerto | Cambia los puertos en `docker-compose.yml` o detén el servicio conflictivo. |
 
 ## Desarrollo local sin Docker
