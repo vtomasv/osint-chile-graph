@@ -20,5 +20,5 @@
 - [x] Revisar `Dockerfile.frontend`, `package.json` y `server/index.ts`: el build usa `esbuild --packages=external`, por lo que `dist/index.js` conserva `import express from "express"` y la imagen final debe incluir `node_modules`.
 - [x] Corregir la imagen final del frontend agregando una etapa `prod-deps` con `pnpm prune --prod` y copiando `/app/node_modules` al runner.
 - [x] Validar que `pnpm build` siga pasando y que el artefacto final pueda resolver `express`; se simuló el runner con `dist`, `package.json` y `node_modules`, sirviendo HTML correctamente en `PORT=4173`.
-- [ ] Crear commit bajo `vtomasv <vtomasv@gmail.com>`, publicar en GitHub y guardar checkpoint.
+- [x] Crear commit bajo `vtomasv <vtomasv@gmail.com>` y publicar en GitHub (`85e4f15`, `main -> main`); queda pendiente guardar checkpoint final.
 - [ ] Entregar a Tom comandos de actualización, rebuild sin caché y verificación del contenedor frontend.
