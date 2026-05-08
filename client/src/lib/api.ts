@@ -49,8 +49,10 @@ export type FindingRelationship = {
   type: string;
   source_id: string;
   source_label: string;
+  source_type?: string;
   target_id: string;
   target_label: string;
+  target_type?: string;
   properties: Record<string, unknown>;
   confidence: number;
 };
@@ -69,8 +71,9 @@ export type HumanTaskItem = {
   id: string;
   label: string;
   value: string;
-  properties: Record<string, unknown>;
+  properties: Record<string, unknown> & { search_url?: string; source?: string; instructions?: string; purpose?: string; status?: string };
   confidence: number;
+  status?: string;
 };
 
 export type TransformRunItem = {
@@ -90,6 +93,27 @@ export type TimelineItem = {
   confidence: number;
 };
 
+export type EntityProfile = {
+  entity: GraphNode;
+  analysis: {
+    title: string;
+    summary: string;
+    facts: string[];
+    gaps: string[];
+    next_steps: string[];
+    mode: string;
+  };
+  relationships: FindingRelationship[];
+  evidence: EvidenceItem[];
+  stats: { relationships: number; evidence: number; human_tasks: number; confidence: number };
+};
+
+export type DossierVisualizations = {
+  treemap: Array<{ name: string; size: number; fill?: string }>;
+  sankey: { nodes: Array<{ name: string }>; links: Array<{ source: number; target: number; value: number }> };
+  semantic_clusters: Array<{ name: string; count: number; avg_confidence: number; examples: Array<Record<string, unknown>> }>;
+};
+
 export type FindingsReport = {
   investigation: Investigation;
   summary: {
@@ -97,17 +121,41 @@ export type FindingsReport = {
     relationships: number;
     evidence: number;
     human_tasks: number;
+    pending_human_tasks?: number;
     transform_runs: number;
     average_confidence: number;
     entity_types: Record<string, number>;
     evidence_by_source: Record<string, number>;
   };
+  analysis?: {
+    mode: string;
+    executive_summary: string;
+    key_findings: string[];
+    gaps: string[];
+    recommended_next_steps: string[];
+    entity_type_distribution: Record<string, number>;
+    ai_status: string;
+  };
   entities: GraphNode[];
+  entity_profiles?: EntityProfile[];
   relationships: FindingRelationship[];
   evidence: EvidenceItem[];
   human_tasks: HumanTaskItem[];
   runs: TransformRunItem[];
   timeline: TimelineItem[];
+  visualizations?: DossierVisualizations;
+};
+
+export type CompleteHumanTaskPayload = {
+  investigation_id: string;
+  task_entity_id?: string;
+  source_name: string;
+  source_url?: string;
+  extract: string;
+  confidence: number;
+  status: "confirmed" | "no_result" | "needs_follow_up" | "discarded";
+  observed_entities: Array<{ type: string; label: string; value?: string; confidence?: number; properties?: Record<string, unknown> }>;
+  notes?: string;
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -132,6 +180,8 @@ export const api = {
     request<GraphNode>("/api/seeds", { method: "POST", body: JSON.stringify(payload) }),
   runTransform: (payload: { investigation_id: string; transform_id: string; input_type: string; value: string }) =>
     request<{ run_id: string; output: unknown; created_entities: GraphNode[] }>("/api/transforms/run", { method: "POST", body: JSON.stringify(payload) }),
+  completeHumanTask: (taskId: string, payload: CompleteHumanTaskPayload) =>
+    request<{ status: string; evidence_id: string; created_entities: GraphNode[] }>(`/api/human-tasks/${taskId}/complete`, { method: "POST", body: JSON.stringify(payload) }),
   aiRun: (payload: { prompt_id: string; variables: Record<string, unknown>; provider?: string; model?: string }) =>
     request<{ provider: string; model: string; content: string }>("/api/ai/run", { method: "POST", body: JSON.stringify(payload) }),
 };

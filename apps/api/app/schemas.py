@@ -69,3 +69,23 @@ class PromptUpdate(BaseModel):
     user_template: str = Field(min_length=1)
     provider: str = "configurable"
     model: str = "configurable"
+
+
+class HumanTaskCompletionRequest(BaseModel):
+    investigation_id: str
+    task_entity_id: str | None = None
+    source_name: str = Field(min_length=2, max_length=255)
+    source_url: str = ""
+    extract: str = Field(min_length=2, max_length=5000)
+    confidence: float = Field(default=0.72, ge=0, le=1)
+    status: Literal["confirmed", "no_result", "needs_follow_up", "discarded"] = "confirmed"
+    observed_entities: list[dict[str, Any]] = []
+    notes: str = ""
+
+
+class ManualEntityInput(BaseModel):
+    type: str = Field(min_length=2, max_length=64)
+    label: str = Field(min_length=1, max_length=255)
+    value: str = ""
+    confidence: float = Field(default=0.72, ge=0, le=1)
+    properties: dict[str, Any] = {}

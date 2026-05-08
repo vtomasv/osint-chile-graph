@@ -38,11 +38,11 @@
 
 ## Nueva solicitud de Tom: expediente OSINT legible, AI y HITL accionable
 
-- [ ] Revisar el estado actual de la pantalla de hallazgos, endpoint `/findings`, modelos de DB y transformaciones para identificar por qué sólo aparecen logs poco útiles.
-- [ ] Crear una vista de expediente por entidad donde se pueda seleccionar un RUT, teléfono, patente, email, dominio, persona o empresa y ver todos sus datos asociados, relaciones, evidencias y tareas pendientes.
-- [ ] Agregar narrativas AI/locales de hallazgos por objetivo y por entidad, con explicación legible, hipótesis, vacíos de información y próximos pasos sugeridos.
-- [ ] Reemplazar el reporte de logs por secciones de valor: resumen del objetivo, fichas enriquecidas, relaciones, fuentes, confianza, timeline y matriz de hallazgos.
-- [ ] Implementar continuidad HITL: abrir/preview de fuentes cuando sea posible, formulario para capturar resultados humanos, guardar evidencia estructurada y asociarla al objetivo/entidad.
-- [ ] Agregar visualizaciones de informe: grafo de relaciones, treemap de tipos de entidades/evidencias, Sankey de origen→transformación→hallazgo y relaciones semánticas agrupadas.
-- [ ] Validar backend/frontend, publicar commit en GitHub y guardar checkpoint final.
+- [x] Revisar el estado actual de la pantalla de hallazgos, endpoint `/findings`, modelos de DB y transformaciones para identificar por qué sólo aparecen logs poco útiles.
+- [x] Crear una vista de expediente por entidad donde se pueda seleccionar un RUT, teléfono, patente, email, dominio, persona o empresa y ver todos sus datos asociados, relaciones, evidencias y tareas pendientes.
+- [x] Agregar narrativas AI/locales de hallazgos por objetivo y por entidad, con explicación legible, hipótesis, vacíos de información y próximos pasos sugeridos.
+- [x] Reemplazar el reporte de logs por secciones de valor: resumen del objetivo, fichas enriquecidas, relaciones, fuentes, confianza, timeline y matriz de hallazgos.
+- [x] Implementar continuidad HITL: abrir/preview de fuentes cuando sea posible, formulario para capturar resultados humanos, guardar evidencia estructurada y asociarla al objetivo/entidad.
+- [x] Agregar visualizaciones de informe: grafo de relaciones, treemap de tipos de entidades/evidencias, Sankey de origen→transformación→hallazgo y relaciones semánticas agrupadas.
+- [x] Validar backend/frontend; falta publicar commit en GitHub y guardar checkpoint final.
 - [ ] Entregar a Tom instrucciones de uso y prueba del nuevo expediente.
