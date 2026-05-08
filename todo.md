@@ -33,5 +33,5 @@
 - [x] Agregar transformaciones transversales para email `.cl`, dominio, nombre/persona y empresa cuando el modelo actual lo permita.
 - [x] Implementar la UI respetando la estética forense actual, con panel detallado de hallazgos, tabs, métricas, tablas, badges de confianza, bitácora y resumen HITL.
 - [x] Validar TypeScript (`pnpm exec tsc --noEmit`), build de producción (`vite build` + `esbuild`), pruebas backend (`PYTHONPATH=apps/api python -m pytest apps/api/tests -q`) y revisar que `Dockerfile.frontend` mantenga las correcciones previas.
-- [ ] Crear commit, publicar en GitHub y guardar checkpoint final.
+- [x] Crear commit y publicar en GitHub (`99141e9`, `github/main`). Falta guardar checkpoint final.
 - [ ] Entregar a Tom instrucciones de actualización y prueba local.
