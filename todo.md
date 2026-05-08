@@ -46,3 +46,14 @@
 - [x] Agregar visualizaciones de informe: grafo de relaciones, treemap de tipos de entidades/evidencias, Sankey de origen→transformación→hallazgo y relaciones semánticas agrupadas.
 - [x] Validar backend/frontend; falta publicar commit en GitHub y guardar checkpoint final.
 - [ ] Entregar a Tom instrucciones de uso y prueba del nuevo expediente.
+
+## Corrección crítica solicitada por Tom: OSINT real, no máscara de datos
+
+- [ ] Auditar transformaciones actuales para identificar cuáles producen evidencia real, cuáles sólo generan dorks/descripciones y cuáles deben pasar a HITL.
+- [ ] Eliminar o rotular explícitamente cualquier fallback/demo para que nunca se confunda con evidencia OSINT real.
+- [ ] Implementar conectores verificables para fuentes públicas/autorizadas, empezando por búsquedas web con evidencia citada, Diario Oficial, SII u otras fuentes accesibles sin evadir controles.
+- [ ] Para fuentes como Rutificador, Volante o Maleta, SII u otras que requieran CAPTCHA, sesión, aceptación manual o restrinjan scraping, crear tareas HITL con navegador integrado, instrucciones, URL de búsqueda y formulario de captura de evidencia real.
+- [ ] Persistir evidencia con URL, fecha de consulta, conector, estado, extracto textual, entidades extraídas, confianza y relación con el objetivo.
+- [ ] Actualizar UI para distinguir con claridad `evidencia real`, `pendiente humano`, `sin acceso automatizado` y `demo desactivado`.
+- [ ] Validar que las transformaciones ya no creen entidades útiles a partir de texto ficticio sino desde resultados reales o desde captura humana explícita.
+- [ ] Ejecutar pruebas, publicar commit en GitHub y guardar checkpoint final.
