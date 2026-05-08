@@ -145,6 +145,7 @@ Si el frontend carga pero no encuentra la API, confirma que el contenedor de API
 | Neo4j Browser pide credenciales | Es el comportamiento normal | Usa `neo4j` y `osint_neo4j_password`, salvo que cambies `.env`. |
 | Build de API falla copiando prompts | Versión antigua del repositorio | Asegúrate de tener el Dockerfile corregido con contexto raíz en `docker-compose.yml`. |
 | `ERR_PNPM_PATCH_NOT_APPLIED` durante build del frontend | `Dockerfile.frontend` antiguo no copia `patches/` antes de `pnpm install` | Ejecuta `git pull --rebase origin main` y reconstruye con `docker compose build --no-cache frontend && docker compose up`. |
+| `ERR_MODULE_NOT_FOUND: Cannot find package 'express' imported from /app/dist/index.js` al levantar `frontend` | Imagen final antigua del frontend copia `dist/` y `package.json`, pero no copia `node_modules` de producción requeridos por el servidor Node empaquetado | Actualiza a `main`, verifica que `Dockerfile.frontend` tenga `COPY --from=prod-deps /app/node_modules ./node_modules`, y reconstruye con `docker compose build --no-cache frontend`. |
 | Puerto ocupado | Otro servicio usa el puerto | Cambia los puertos en `docker-compose.yml` o detén el servicio conflictivo. |
 
 ## Desarrollo local sin Docker

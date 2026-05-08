@@ -14,3 +14,11 @@
 - [x] Comparar el log enviado por Tom con el Dockerfile corregido: su log muestra `RUN corepack enable && pnpm install` en la línea 4, mientras el corregido tiene `COPY patches ./patches` en la línea 4 y el `RUN` en la línea 5; por lo tanto Tom está construyendo desde una copia anterior o desde otro directorio.
 - [x] Preparar comandos de recuperación: la corrección ya fue publicada en GitHub con `git push github main`; Tom puede usar `git fetch origin main` y `git reset --hard origin/main` si no tiene cambios locales, o parche manual si su copia apunta a otro directorio.
 - [x] Incluir limpieza de caché de build Docker y verificación previa con `nl -ba Dockerfile.frontend` antes de reconstruir.
+
+## Nuevo reporte de Tom: frontend container falla por `ERR_MODULE_NOT_FOUND: express`
+
+- [x] Revisar `Dockerfile.frontend`, `package.json` y `server/index.ts`: el build usa `esbuild --packages=external`, por lo que `dist/index.js` conserva `import express from "express"` y la imagen final debe incluir `node_modules`.
+- [x] Corregir la imagen final del frontend agregando una etapa `prod-deps` con `pnpm prune --prod` y copiando `/app/node_modules` al runner.
+- [x] Validar que `pnpm build` siga pasando y que el artefacto final pueda resolver `express`; se simuló el runner con `dist`, `package.json` y `node_modules`, sirviendo HTML correctamente en `PORT=4173`.
+- [ ] Crear commit bajo `vtomasv <vtomasv@gmail.com>`, publicar en GitHub y guardar checkpoint.
+- [ ] Entregar a Tom comandos de actualización, rebuild sin caché y verificación del contenedor frontend.
